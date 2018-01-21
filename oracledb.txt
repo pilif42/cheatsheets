@@ -1,0 +1,1 @@
+- tnsnames.ora under = D:\ORACLE\ora11g\NETWORK\ADMIN

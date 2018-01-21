@@ -1,0 +1,33 @@
+- Installed the Cucumber plugin with:
+               - Help->Install New Software'.
+               - Click on 'Add' button
+               - Enter any name e.g. 'Cucumber' and type 'http://cucumber.github.com/cucumber-eclipse/update-site' as location.
+
+ 
+- To debug with LEDR:
+               - edit D:\ORACLE\mw11g\user_projects\domains\ledr_local\bin\startWebLogic.cmd
+                                             - at line 78, add: call setDomainEnv.cmd
+
+               - edit setDomainEnv.cmd and add at line 136 the below:
+                                             set debugFlag=true
+                                             set DEBUG_PORT=8453
+                                             set PRODUCTION_MODE=false
+
+               - in Eclipse, Run menu, Debug Configurations, Remote Java Application and New:
+                                             - choose a Name
+                                             - in the Connect tab:
+                                                                           - choose a project (lerp-ui)
+                                                                           - Connection Type = Standard (Socket Attach)
+                                                                           - Connection Props: localhost & 8453
+                                             - in the Source tab:
+                                                                           - add projects for which you will want to debug the code.
+                                             - Apply & Close.
+											 
+               - rebuild the app from the latest code and redeploy to Weblogic: important as otherwise the debug hook with the code in Eclipse may not synch exactly.
+               - verify http://localhost:7050/lerp/login.xhtml is up.
+               - in Eclipse, start the debug config created above and this should hook up with your WebLogic.
+
+			   
+- To modify fonts/colours:
+               - for Checkstyle warnings: Windows --> Preferences --> General -> Editors -> Text Editors -> Annotations
+			   
