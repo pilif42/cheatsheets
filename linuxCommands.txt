@@ -1,0 +1,108 @@
+- in vi:
+	- go to the beginning of line 13: :13
+	- go to column 270 of the current line: 270|
+
+
+- list contents of a .jar: jar tf my.jar
+
+
+- location of keys: /nfshome/philippe.brossier/.ssh
+
+
+- find some text in all files:
+	- grep -rnw '/path/to/somewhere/' -e "filou"
+		--> -r or -R is recursive
+		--> -n is line number 
+		--> -w stands match the whole word
+		--> -l (lower-case L) can be added to just give the file name of matching files
+
+
+- man followed by a space and any command at a shell prompt.
+		- For example, type man su and the man page for the su command appears.
+		- To scroll forward through the document, press [Space]; to scroll back, press [b]. To quit the document, press [q].
+		
+
+- remove a non-empty directory
+		- rm -r yourdir
+
+
+- remove a directory without being prompted for anything: rm -r code_perso -f
+
+		
+- to find any file *.policy in the current directory or below
+		- find . -name *.policy
+
+		
+- to find a directory called apache:
+		- find / -type d -name "apache" 2> /dev/null
+
+		
+- to find a file containing the text "mod_proxy_ajp.so":
+		- find . -name “*.*” | xargs grep 'mod_proxy_ajp.so'
+
+		
+- amount of free disk space:
+		- df -h
+
+
+- find a server's date:
+		- date will give you Thu Feb 17 06:42:54 EST 2011
+
+		
+- find which ports are in use:
+		- netstat -pln
+		- if you are after the pid of the process on 8131: netstat -pln | grep 8131 
+
+
+- to kill a process (-9 is for force it no matter what):
+		- kill -9 thePID
+
+		
+- copy files:
+		- cp *.tif /usr/geoserver/data/data/inspire/50k/
+
+		
+- copy a directory, including all its files and subdirectories, to another directory, enter:
+     	- cp -R /var/www/html/inspire/2_1_0_3 /var/www/html/inspire/philversion
+
+
+- when having issues after having copied a file from windows:
+		- dos2unix filename
+
+		
+- replace all occurences of string 46.137.100.142 with 46.137.121.28 in vi:
+		- :1,$s/46.137.100.142/46.137.121.28/
+
+		
+- to search the logs for a string (in our case, WARN.*TIMING):
+		- grep 'WARN.*TIMING' application.log | cut -d" " -f"1,6,11,22-"
+
+
+- to solve problem with packet size (symptoms = downloads/uploads fail):
+	- sudo ip link set mtu 1464 dev ens160
+
+
+- to change permissions on /opt/mix to the default user:
+	- sudo chown $USER /opt/mix -R
+	- sudo chgrp Users /opt/mix -R ou sudo chgrp $USER /opt/mix -R
+
+
+- to change permissions on /opt/mix to everyone doing anything:
+	- sudo chown 777 /opt/mix
+
+
+- to set environment variables in a given tab (it is only valid within this tab):
+	- brand new variable:
+		- export DRS_URL=http://www.bbc.co.uk
+		- echo $DRS_URL --> to verify its value
+	- modify existing variable:
+		- export PATH=$PATH:/opt/scripts
+		- echo $PATH
+
+
+- to list all services: 
+	- systemctl list-unit-files
+
+
+- to stop a service called postgresql-9.3.service:
+	- systemctl stop postgresql-9.3.service

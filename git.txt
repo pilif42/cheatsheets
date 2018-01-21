@@ -1,0 +1,133 @@
+- to play with ssh keys:
+	- start with: eval "$(ssh-agent -s)"
+	- to list all keys in your agent: ssh-add -l
+	- to delete a key from your agent: ssh-add -d ~/.ssh/hotmail_id_rsa
+	- to add a key to your agent: ssh-add -K ~/.ssh/keyForOns_rsa
+
+
+- to untrack *.iml files (IntelliJ-specific stuff) checked in by error:
+	- cd to the top directory of the project (ie /nfshome/philippe.brossier/code_ctp/beyond-soa-demo)
+	- git rm --cached *.iml
+	- git add --all
+	- git commit -m 'your msg'
+	- git push
+	- Also, remember to add *.iml in .gitgnore in /nfshome/philippe.brossier/code_ctp/beyond-soa-demo
+
+
+- to revert all my local changes:
+			- git checkout .
+
+			
+- to stash all my local changes (See http://gitready.com/beginner/2009/01/10/stashing-your-changes.html):
+			- cd in the top dir
+			- git add --all
+			- git stash
+			
+			
+- to commit a change:
+			- cd to the directory where the file was changed.
+			- git add the_file_name
+			- git commit -m 'my commit msg'
+			- git push
+			
+		
+- to create a remote branch called shop from master:
+			- put yourself on the master: git checkout master
+			- git checkout -b shop
+			- git push origin shop
+
+
+- to create a branch (ctpa1511) from another branch (ctpa1503) which is not master:
+			- git checkout -b ctpa1511 ctpa1503
+			- do your work so: git add --all, git commit -m, etc.
+			- merge your changes to ctpa1503 without a fast-forward:
+				- git checkout ctpa1503
+				- git merge --no-ff ctpa1511
+			- push changes to the server:
+				- git push origin ctpa1503
+				- git push origin ctpa1511
+				
+
+- to delete a local branch called shop:
+			- git branch -d shop
+			
+			
+- to delete a remote branch called shop:
+			- git push origin --delete shop
+			
+			
+- to switch branch from shop to master:
+			- git checkout master
+			
+			
+- to switch to another existing branch:
+			- git branch -a --> will list all available branches
+			- git fetch origin
+			- git checkout the_existing_branch
+			
+			
+- to bring all my changes from phillocation to master:
+			- git checkout phillocation
+			- git pull
+			- git checkout master
+			- git merge phillocation
+			
+			
+- to rebase my local branch cspb253 with what is on the development branch:
+			- git checkout development
+			- git pull
+			- git checkout cspb253
+			- git rebase development
+			- git push --force (this is ok if I am the only one on the branch)
+				
+				
+- to NOT track all directories and files when you create a project:
+		- create .gitignore at the root of the project with (and then add, commit, push immediately before doing any other checkins):
+					*.class
+					*.iml
+					.idea
+					target/
+		- to untrack what has already been checked in by mistake:
+				- for .idea: git rm -r --cached .idea (--> this removes it from Git but leaves it locally on my box)
+				- for directory target: git rm -r --cached target (--> this removes it from Git but leaves it locally on my box)
+				
+				
+- to add existing code into GitHub (use the SSH option so we do not have to type in constantly username/pwd):
+		- copy an existing .gitignore at the root of the project
+		- git init
+		- git add .
+		- git remote add origin git@github.com:pilif42/springBootRestfulService.git
+		- git push -u origin master
+
+
+- to revert to a specific commit:
+		- git log -n1
+		- git checkout thefullsha (found in GitLab --> Commits)
+		- to return to the latest on master: git checkout master
+		- to revert master to the given tag: git push -f (ATTENTION: you will lose the history between this tag and the latest!!!)
+		
+
+
+- to work with a project which is in 2 different git repos (1 in gitlab, 1 in github):
+		- imagine that you first cloned your project from GitLab. John then copied the entire project in GitHub and has hooked Jenkins jobs to the GitHub repo.
+		- you need to do first:
+			- git remote add github git@github.com:ONSdigital/rm-common-service.git
+			- git remote add github git@github.com:ONSdigital/response-management-service.git
+		- to push changes to GitLab (pull similar): 
+			- git push origin master 
+		- to push changes to GitHub (pull similar): 
+			- git push github master
+
+
+- to get the history on a specific file (for instance CaseSvcApplication.java):
+		- git log --follow -p CaseSvcApplication.java
+
+
+- to list all applied tags:
+		- git tag
+
+
+- to revert to a specific tag (for instance: release_11):
+		- git checkout release_11
+		- to return to the latest on master: git checkout master
+		- to revert master to the given tag: git push -f (ATTENTION: you will lose the history between this tag and the latest!!!)

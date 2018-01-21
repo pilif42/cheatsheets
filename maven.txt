@@ -1,0 +1,86 @@
+- repositories:
+	- settings.xml:
+		- default local one at /nfshome/philippe.brossier/.m2
+		- other one (where we say not to go to Maven Central) at /usr/share/maven/conf/
+
+	- my local repo in Centos = /opt/mix/m2/repository
+
+
+- to build without tests: mvn clean install -DskipTests=true
+
+				
+- for a standalone Java project: follow tutorial at http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html
+	- to create the project skeleton:
+			- cd c:\myMaven
+			- mvn archetype:generate -DgroupId=com.mycompany.app -DartifactId=philTestMavenApp -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+		
+	- to build the project:
+			- cd C:\myMaven\philTestMavenApp
+			- mvn package
+			--> this created philTestMavenApp-1.0-SNAPSHOT.jar under C:\myMaven\philTestMavenApp\target
+				
+	- to execute the project:
+			- cd C:\myMaven\philTestMavenApp
+			- java -cp target/philTestMavenApp-1.0-SNAPSHOT.jar com.mycompany.app.App
+			--> it prints out: Hello World!
+			
+	- to generate documentation:
+			- cd C:\myMaven\philTestMavenApp
+			- mvn site
+			--> this created htnml docs under C:\myMaven\philTestMavenApp\target\site
+				
+	- meaning of mvn clean dependency:copy-dependencies package:
+			- 1) clean the project
+			- 2) copy dependencies
+			- 3) package the project executing all phases up to package, ie:
+						- validate: validate the project is correct and all necessary information is available
+						- compile: compile the source code of the project
+						- test: test the compiled source code using a suitable unit testing framework. These tests should not require the code be packaged or deployed
+						- package: take the compiled code and package it in its distributable format, such as a JAR.
+
+						
+- for an Android project:
+		- set environment variable ANDROID_HOME to the path of your installed Android SDK
+		- add %ANDROID_HOME%\tools and %ANDROID_HOME%\platform-tools to your $PATH
+		- followed instructions at http://stand.spree.de/wiki_details_maven_archetypes
+				- the git repo is at https://github.com/akquinet/android-archetypes
+				- to create the project skeleton:
+						- cd C:\myMaven
+						- mvn archetype:generate -DgroupId=com.mycompany.app -DartifactId=philTestAndroidApp -DarchetypeArtifactId=android-quickstart -DarchetypeGroupId=de.akquinet.android.archetypes -DarchetypeVersion=1.0.11
+									- version asked: I put 1.
+									- platform asked: I put Y for 16
+									--> it created a skeleton under C:\myMaven\philTestAndroidApp
+									
+				- to deploy the project to a phone:
+						- plugin phone
+						- cd C:\myMaven\philTestAndroidApp
+						- mvn clean install android:deploy
+						--> note that philTestAndroidApp.apk ends up under C:\myMaven\philTestAndroidApp\target
+						
+				- to add Proguard to it:
+						- created proguard.conf under C:\myMaven\philTestAndroidApp with:
+									-injars      target/classes
+									-outjars     target/generated-sources
+									-libraryjars C:/Docume~1/pbrossier/Local Settings/Application Data/Android/android-studio/sdk/platforms/android-16/android.jar
+
+									-dontpreverify
+									-repackageclasses ''
+									-allowaccessmodification
+									-optimizations !code/simplification/arithmetic
+
+									# the keep option specifies the entry point of the application that has to be preserved
+									-keep public class com.mycompany.app.HelloAndroidActivity
+						- added to my pom.xml in <configuration> of plugin <groupId>com.jayway.maven.plugins.android.generation2</groupId>:
+									<proguard>
+											<skip>false</skip>
+											<config>proguard.conf</config>
+									</proguard>
+						- ran with: mvn clean install android:deploy
+						- proguard output left under C:\myMaven\philTestAndroidApp\target\proguard
+						- compared the .apk:
+								- without proguard: 44 KB
+								- with proguard: 43 KB
+										- dump.txt: Describes the internal structure of all the class files in the .apk file
+										- mapping.txt: Lists the mapping between the original and obfuscated class, method, and field names. This file is important when you receive a bug report from a release build, because it translates the obfuscated stack trace back to the original class, method, and member names. See Decoding Obfuscated Stack Traces for more information.
+										- seeds.txt: Lists the classes and members that are not obfuscated
+										- usage.txt: Lists the code that was stripped from the .apk

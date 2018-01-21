@@ -1,0 +1,54 @@
+- CentOS install:
+	- download ideaIC-15.0.3.tar.gz from the web UI
+	- sudo mv ideaIC-15.0.3.tar.gz /opt
+	- DO NOT delete the previous version as it will be used to migrate settings at 1st start up of the new version.
+	- from /opt:
+		- sudo tar -xvzf ideaIC-15.0.3.tar.gz
+		- sudo chown $USER idea-IC-143.1821.5
+		- sudo chgrp $USER idea-IC-143.1821.5
+	- from /opt/idea-IC-143.1821.5/bin:
+		- ./idea.sh
+	- now delete the old version
+	
+
+- font size (sur Mac, acces a ces menus avec ToucheMac + ,): 
+	- Settings > Appearance & Behaviour > Appearance > tick Override default fonts and bump up to 17
+	- Scroll with the mouse: Settings > Editor > General > tick box mentioning mouse wheel
+
+
+- maven setup: 
+	- Settings > Build, Execution, Deployment > Build tools > Maven > Repositories and add location of the local one.
+
+
+- to run a Spring Boot app from within IntelliJ:
+		- edit Run/Debug Configurations
+		- click on the green + and select Application
+		- for the Main class = uk.co.os.DataMigrationCommandLineLauncher
+		- for the Program arguments:
+					- to run with a local props: --spring.config.location=./profile/local/main/resources/application.properties
+					- to run with a Spring Cloud server: --spring.cloud.config.uri=http://springcloudserver.csp-springcloud-dev.cspsupport.svc.tutum.io:8090
+--spring.cloud.config.failfast=true
+--spring.application.name=cspappstoreapi
+--spring.profiles.active=dev
+--spring.cloud.config.username=user
+--spring.cloud.config.password=qx6wAL7#CKqz=T
+--spring.cloud.config.label=csp
+
+		
+- to connect to a database:
+		- select the Database tab on the right hand side
+		- select the green + and Data Source and then the type Mysql or else
+		- enter all details and Test connection
+		- press OK
+		- double click on the new link and then on the schema with right-click. Select Diagrams and Visualization.
+
+
+- CheckStyle:
+	- get the plugin CheckStyle-IDEA
+	- set up the config file to base scans on. F4 --> Other Settings (at the bottom) --> checkstyle
+
+
+- To be able to use Java 7:
+	- Ctrl + Shift + Alt + S
+	- Project Settings --> Project --> Project SDK + Project Language Level
+	- Project Settings --> Modules --> Sources tab + Language level

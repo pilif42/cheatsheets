@@ -1,0 +1,50 @@
+- to start all existing containers in the background:
+copy docker-compose-dev_env.yml and docker-compose-services.yml from rm-docker-dev to /Users/philippebrossier/devtools/rmdockerdev 
+cd /Users/philippebrossier/devtools/rmdockerdev
+docker login
+sdcplatform / xxx
+docker-compose -f docker-compose-dev_env.yml pull 
+docker-compose -f docker-compose-dev_env.yml up -d  
+docker-compose -f docker-compose-services.yml pull
+docker-compose -f docker-compose-services.yml up -d  
+
+
+- to delete all containers:
+cd /Users/philippebrossier/code/rm-docker-dev
+docker-compose -f docker-compose-dev_env.yml stop
+docker-compose -f docker-compose-dev_env.yml rm
+
+
+- to delete a specific container:
+docker stop <CONTAINER_NAME>
+docker rm <CONTAINER_NAME>
+
+
+- to create a RabbitMQ container:
+docker run -d --hostname rabbit --name rmdockerdev_rabbitmq_1 -p 4369:4369 -p 25672:25672 -p 5671-5672:5671-5672 -p 15671-15672:15671-15672 rabbitmq:3.6-management
+
+
+- to create a Postgres container:
+docker run --name rmdockerdev_ons-postgres_1  -d -p 5432:5432 ons_postgres
+docker start rmdockerdev_ons-postgres_1
+
+
+- to create a Redis container:
+docker run --name rmdockerdev_redis_1  -d redis
+
+
+- to view running containers:
+docker ps
+
+
+- to view all containers:
+docker ps -a
+
+
+- to open a bash command line window into the postgres container:
+docker exec -it postgres bash
+cd docker-entrypoint-initdb.d/ if you want to see the sql files that have been copied over.
+
+
+- to access postgres:
+docker exec -it rmdockerdev_ons-postgres_1 postgres -U postgres -d postgres
