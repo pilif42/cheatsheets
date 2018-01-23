@@ -78,6 +78,10 @@
 			- git pull
 			- git checkout cspb253
 			- git rebase development
+			- when there is a conflict:
+					- solve the conflict in for instance src/main/resources/application.yml
+					- git add src/main/resources/application.yml (AND no commit)
+					- git rebase --continue
 			- git push --force (this is ok if I am the only one on the branch)
 				
 				
