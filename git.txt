@@ -14,8 +14,11 @@
 	- Also, remember to add *.iml in .gitgnore in /nfshome/philippe.brossier/code_ctp/beyond-soa-demo
 
 
-- to revert all my local changes:
-			- git checkout .
+- to revert:
+		- all my local changes: git stash –u
+		- only Unstaged Tracked files: git checkout .
+		- only Unstaged UnTracked files: git clean –f
+		- only Staged Tracked and UnStaged Tracked files: git reset –hard
 
 			
 - to stash all my local changes (See http://gitready.com/beginner/2009/01/10/stashing-your-changes.html):
@@ -50,6 +53,7 @@
 
 - to delete a local branch called shop:
 			- git branch -d shop
+			- git branch -D shop (to force delete)
 			
 			
 - to delete a remote branch called shop:
@@ -61,7 +65,7 @@
 			
 			
 - to switch to another existing branch:
-			- git branch -a --> will list all available branches
+			- git branch -a --> will list all available branches (remote & local)
 			- git fetch origin
 			- git checkout the_existing_branch
 			
