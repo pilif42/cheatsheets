@@ -44,11 +44,11 @@
 			- git checkout -b ctpa1511 ctpa1503
 			- do your work so: git add --all, git commit -m, etc.
 			- merge your changes to ctpa1503 without a fast-forward:
-				- git checkout ctpa1503
-				- git merge --no-ff ctpa1511
+					- git checkout ctpa1503
+					- git merge --no-ff ctpa1511
 			- push changes to the server:
-				- git push origin ctpa1503
-				- git push origin ctpa1511
+					- git push origin ctpa1503
+					- git push origin ctpa1511
 				
 
 - to delete a local branch called shop:
