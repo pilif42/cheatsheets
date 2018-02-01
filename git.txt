@@ -108,12 +108,17 @@
 		- git push -u origin master
 
 
-- to revert to a specific commit:
+- to reset to a specific commit:
 		- git log -n1
 		- git checkout thefullsha (found in GitLab --> Commits)
 		- to return to the latest on master: git checkout master
 		- to revert master to the given tag: git push -f (ATTENTION: you will lose the history between this tag and the latest!!!)
 		
+		
+- to reset to a specific tag (for instance: release_11):
+		- git checkout release_11
+		- to return to the latest on master: git checkout master
+		- to revert master to the given tag: git push -f (ATTENTION: you will lose the history between this tag and the latest!!!)
 
 
 - to work with a project which is in 2 different git repos (1 in gitlab, 1 in github):
@@ -134,8 +139,16 @@
 - to list all applied tags:
 		- git tag
 
-
-- to revert to a specific tag (for instance: release_11):
-		- git checkout release_11
-		- to return to the latest on master: git checkout master
-		- to revert master to the given tag: git push -f (ATTENTION: you will lose the history between this tag and the latest!!!)
+		
+- to revert a specific commit:
+		- if you want to auto-commit: git revert <commitHash>
+		- if not: git revert --no-commit <commitHash>
+		
+		
+- to revert the last 3 commits:
+		- A <-- B  <-- C <-- D      <-- master <-- HEAD
+		- git revert --no-commit D
+		- git revert --no-commit C
+		- git revert --no-commit B
+		- git commit -m "the commit message"
+		
