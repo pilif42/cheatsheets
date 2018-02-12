@@ -1,0 +1,9 @@
+- GET example with option v:
+curl -k -v -X GET 'https://someserver.com/' -H "Accept:application/hal+json" -H "Accept-Language:en-US" -H "Cache-Control:no-store" -H "Content-Type:application/hal+json"
+		- flag k for the https and to ignore the SSL certif warning.
+		- flag v for verbose. It makes the operation more talkative. You can replace v with i to only get headers and body.
+
+		
+- POST examples:
+curl -d '{"key1":"value1", "key2":"value2"}' -H "Content-Type: application/json" -X POST http://localhost:3000/data
+curl -d "@data.json" -X POST http://localhost:3000/data
