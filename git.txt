@@ -51,14 +51,18 @@
 					- git push origin ctpa1511
 				
 
-- to delete a local branch called shop:
-			- git branch -d shop
-			- git branch -D shop (to force delete)
+- housekeeping:
+		- to delete a local branch called shop:
+				- git branch -d shop
+				- git branch -D shop (to force delete)
+		
+		- to delete a remote branch called shop:
+				- git push origin --delete shop
 			
-			
-- to delete a remote branch called shop:
-			- git push origin --delete shop
-			
+		- to clean-up outdated references:
+				- git remote prune origin
+				- or git fetch –p
+				
 			
 - to switch branch from shop to master:
 			- git checkout master
@@ -66,6 +70,8 @@
 			
 - to switch to another existing branch:
 			- git branch -a --> will list all available branches (remote & local)
+						- to list only local ones: git branch
+						- to list only remote ones:  git branch –r
 			- git fetch origin
 			- git checkout the_existing_branch
 			
