@@ -1,0 +1,4 @@
+- To force all dependencies to be re-resolved:
+	./gradlew clean build --refresh-dependencies
+	- I had to use this on a project when a dependency .jar changed but its version was kept at 1.0.0_snapshot. The tag --refresh-dependencies forced a download of the latest 1.0.0_snapshot.
+	
