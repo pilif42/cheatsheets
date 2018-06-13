@@ -163,6 +163,7 @@ task integrationTest(type: Test) {
     classpath = sourceSets.integrationTest.runtimeClasspath
     // To make sure that integration tests are run on each build
     outputs.upToDateWhen { false }
+	jvmArgs = ["-Djavax.net.ssl.trustStore=src/integration-test/resources/cacerts", "-Djava.security.auth.login.config=src/integration-test/resources/kafka_client_jaas.conf"]
 }
 
 check.dependsOn integrationTest
