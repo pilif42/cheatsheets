@@ -92,7 +92,12 @@
 					- solve the conflict in for instance src/main/resources/application.yml
 					- git add src/main/resources/application.yml (AND no commit)
 					- git rebase --continue
-			- git push --force (this is ok if I am the only one on the branch)
+			- if I am the only one on the branch:
+					- git push --force
+			- if I am not the only one:
+					- git pull origin cspb253
+					- solve conflicts and git add ..., git commit
+					- git push
 				
 				
 - to NOT track all directories and files when you create a project:
