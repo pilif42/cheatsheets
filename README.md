@@ -1,2 +1,2 @@
 # cheatsheets
-This is a repo to store reminders on various technologies.
+This is a repository to store reminders on various technologies.
