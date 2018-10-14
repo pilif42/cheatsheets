@@ -1,4 +1,26 @@
 - To force all dependencies to be re-resolved:
 	./gradlew clean build --refresh-dependencies
 	- I had to use this on a project when a dependency .jar changed but its version was kept at 1.0.0_snapshot. The tag --refresh-dependencies forced a download of the latest 1.0.0_snapshot.
-	
+
+
+- To publish to local Maven with Gradle
+./gradlew clean build publishToMavenLocal
+
+
+- To ensure unit tests are run with jvmArgs:
+test {
+   jvmArgs = ["-Djavax.net.ssl.trustStore=src/test/resources/cacerts"]
+}
+
+
+- To exclude a dependency added in compile and that causes an issue in test at runtime:
+configurations {
+    testRuntime.exclude group: 'org.springframework.cloud', module: 'spring-cloud-starter-netflix-eureka-client'
+}
+
+
+- To exclude a dependency added in compile and that causes an issue in test at compiletime:
+configurations {
+    testCompile.exclude group: 'javax.ws.rs', module: 'jsr311-api'
+}
+ 

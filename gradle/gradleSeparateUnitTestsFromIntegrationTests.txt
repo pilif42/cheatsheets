@@ -2,7 +2,7 @@ To put together our working solution, I used the documentation at:
 - https://www.petrikainulainen.net/programming/gradle/getting-started-with-gradle-integration-testing/
 - https://guides.gradle.org/migrating-from-maven/
 
- 
+
 The project code is organized as per below:
 src/integration-test/java
 src/integration-test/resources
@@ -31,7 +31,7 @@ or
 or
 ./gradlew clean build
 
- 
+
 The build.gradle is below:
 buildscript {
     ext {
@@ -57,28 +57,12 @@ apply from: 'common.gradle'
 apply plugin: 'spring-boot'
 apply plugin: 'groovy'
 apply plugin: 'distribution'
+apply from: 'integrationTest.gradle'
 
 project.group = 'com.discover.epp'
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
-
-// This is to define our module for integration tests
-sourceSets {
-    integrationTest {
-        java {
-            compileClasspath += main.output + test.output
-            runtimeClasspath += main.output + test.output
-            srcDir file('src/integration-test/java')
-        }
-        resources.srcDir file('src/integration-test/resources')
-    }
-}
-
-configurations {
-    integrationTestCompile.extendsFrom testCompile
-    integrationTestRuntime.extendsFrom testRuntime
-}
 
 dependencies {
     compile("org.springframework.boot:spring-boot-starter-amqp:${springBootVersion}")
@@ -158,17 +142,6 @@ task deleteFiles(type: Delete) {
     }
 }
 
-task integrationTest(type: Test) {
-    testClassesDir = sourceSets.integrationTest.output.classesDir
-    classpath = sourceSets.integrationTest.runtimeClasspath
-    // To make sure that integration tests are run on each build
-    outputs.upToDateWhen { false }
-	jvmArgs = ["-Djavax.net.ssl.trustStore=src/integration-test/resources/cacerts", "-Djava.security.auth.login.config=src/integration-test/resources/kafka_client_jaas.conf"]
-}
-
-check.dependsOn integrationTest
-integrationTest.mustRunAfter test
-
 // To make sure that we have separate reports for test and integrationTest
 tasks.withType(Test) {
     reports.html.destination = file("${reporting.baseDir}/${name}")
@@ -182,3 +155,45 @@ tasks.withType(JavaCompile) {
 init.finalizedBy copyEnvConfig
 bootRepackage.finalizedBy enableTar
 enableTar.finalizedBy assembleDist
+
+
+The integrationTest.gradle is below:
+sourceSets {
+    integTest {
+        java {
+            compileClasspath += main.output
+            runtimeClasspath += main.output
+            srcDir file('src/integration-test/java/')
+        }
+        resources.srcDirs = [file('bin/_common/ext-lib'), file('src/integration-test/resources')]
+    }
+
+    manualIntegTest {
+        java {
+            compileClasspath += main.output + integTest.output
+            runtimeClasspath += main.output
+            srcDirs = ['src/manual-integration-test/java']
+        }
+        resources {
+            resources.srcDirs = [file('bin/_common/ext-lib'), file('src/manual-integration-test/resources')]
+        }
+    }
+}
+
+task integTest(type: Test) {
+    testClassesDir = sourceSets.integTest.output.classesDir
+    classpath = sourceSets.integTest.runtimeClasspath
+    // To make sure that integration tests are run on each build
+    outputs.upToDateWhen { false }
+    jvmArgs = ["-Djavax.net.ssl.trustStore=src/integration-test/resources/cacerts", "-Djava.security.auth.login.config=src/integration-test/resources/kafka_client_jaas.conf"]
+}
+
+check.dependsOn integTest
+
+dependencies {
+    integTestCompile sourceSets.main.output
+    integTestCompile configurations.testCompile
+
+    manualIntegTestCompile sourceSets.main.output
+    manualIntegTestCompile configurations.testCompile
+}
