@@ -87,10 +87,13 @@
 			- git checkout development
 			- git pull
 			- git checkout cspb253
+			- git pull origin cspb253
 			- git rebase development
 			- when there is a conflict:
 					- solve the conflict in for instance src/main/resources/application.yml
 					- git add src/main/resources/application.yml (AND no commit)
+					- sometimes you may have to do instead: git rm src/test/objToDelete
+					- git status and verify you can see: all conflicts fixed: run "git rebase --continue"
 					- git rebase --continue
 			- if I am the only one on the branch:
 					- git push --force
