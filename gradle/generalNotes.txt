@@ -23,4 +23,17 @@ configurations {
 configurations {
     testCompile.exclude group: 'javax.ws.rs', module: 'jsr311-api'
 }
- 
+
+
+- To use a class belonging to project_A in src/test in a project_B:
+		- AvroContextUtil is in src/test of module common-storm-ingest
+		- We want to use it in module ods-storm-event-ingest (in src/test).
+		- Simply add the line below in build.gradle of ods-storm-event-ingest:
+					testCompile project(':common-storm-ingest').sourceSets.test.output
+		- Note that we also had:
+					compile(project(':common-storm-ingest')) {
+					    exclude group: 'org.apache.zookeeper'
+					    exclude group: 'org.slf4j'
+					    exclude group: 'log4j'
+					    exclude group: 'org.apache.curator'
+					}
