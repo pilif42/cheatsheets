@@ -1,0 +1,78 @@
+- Pb to solve: in the class IINClientRepositoryImpl (which is a @Component), we want to auto-wire a RestTemplate and qualify it with a name (as it
+ can only be one of the 2 beans that we configure using @ConditionalOnProperty below – we do NOT want any other RestTemplate and also if they
+ were other RestTemplates in the container and we did not qualify ours, then Spring would throw an exception saying it can not decide which bean
+ to choose for the auto-wiring)
+
+
+In IINCacheConfig (which is a @Configuration), we have:
+@Bean(name = "iinServiceRestTemplate")
+@IINServiceRestTemplateType("noEureka")
+@ConditionalOnProperty(name = "iincache.service-registry.enabled", havingValue = "false")
+public RestTemplate restTemplate() {
+    return new RestTemplateBuilder().rootUri(iinDataServiceAPIUrl)
+            .errorHandler(new DefaultResponseErrorHandler())
+            .interceptors(Arrays.asList(new LoggingClientHttpRequestInterceptor()))
+            .build();
+}
+
+@Bean(name = "iinServiceRestTemplate")
+@LoadBalanced
+@IINServiceRestTemplateType("viaEureka")
+@ConditionalOnProperty(name = "iincache.service-registry.enabled", havingValue = "true")
+public RestTemplate eurekaRestTemplate(@Value("${iincache.service-registry.username:#{null}}") String eurekaUsername,
+  @Value("${iincache.service-registry.pass:#{null}}") String eurekaPassword) {
+    List<ClientHttpRequestInterceptor> interceptors = new ArrayList<>();
+    interceptors.add(new LoggingClientHttpRequestInterceptor());
+    if (eurekaUsername == null || eurekaPassword == null) {
+        LOGGER.info("Eureka credentials not provided - basic authentication is not used");
+    } else {
+        LOGGER.info("Eureka credentials provided - basic authentication is used");
+        interceptors.add(new BasicAuthorizationInterceptor(eurekaUsername, eurekaPassword));
+    }
+
+    return new RestTemplateBuilder().rootUri(String.format(SERVICE_NAME_PREFIX, iinDataServiceAPIName))
+            .errorHandler(new DefaultResponseErrorHandler() {
+                @Override
+                public boolean hasError(ClientHttpResponse response) throws IOException {
+                    return super.hasError(response) && (response.getStatusCode().series() != HttpStatus.Series.CLIENT_ERROR);
+                }
+            })
+            .interceptors(interceptors)
+            .build();
+}
+
+
+Where
+
+@Target({ElementType.METHOD, ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface IINServiceRestTemplateType {
+    String value() default "";
+}
+
+
+And in IINClientRepositoryImpl:
+@Autowired @Qualifier("iinServiceRestTemplate")
+private transient RestTemplate restTemplate;
+
+
+- The problem: we want to load the IINCache at startup. It involves a call using a RestTemplate annotated with @LoadBalanced (which makes use of
+ Ribbon). Spring does not recommend use of Ribbon during startup. We tried (the load was done inside the constructor of the autowired
+ MetaDataCacheService) and it was failing as not all the Eureka-related artifacts were ready for use.
+
+Solution 1: do not do the loading at startup (move the loading out of the constructor into a separate public method). Instead, load the cache
+when it is first used. If however the initial load takes a long time (ie several minutes), favour solution 2.
+
+Solution 2: do the loading right at the end of the startup thanks to the below that you add to a @Configuration class
+
+@Bean
+public ApplicationListener<SpringApplicationEvent> applicationListener(MetaDataCacheService metaDataCacheService) {
+    return new ApplicationListener<SpringApplicationEvent>() {
+        @Override
+       public void onApplicationEvent(SpringApplicationEvent event) {
+            if (event instanceof ApplicationReadyEvent) {
+                metaDataCacheService.setup();
+            }
+        }
+    };
+}
