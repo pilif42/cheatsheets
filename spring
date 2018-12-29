@@ -76,3 +76,64 @@ public ApplicationListener<SpringApplicationEvent> applicationListener(MetaDataC
         }
     };
 }
+
+
+- Problem: circuit-breaking with Hystrix
+
+To add to build.gradle:
+compile "org.springframework.cloud:spring-cloud-starter-hystrix"
+compile "org.springframework.cloud:spring-cloud-starter-hystrix-dashboard"
+
+
+On the main application:
+@EnableCircuitBreaker
+@EnableHystrixDashboard
+
+
+In application.properties, add sth similar to. More details on Hystrix configuration can be found at https://github.com/Netflix/Hystrix/wiki/Configuration
+hystrix:
+  command:
+    default:
+      circuitBreaker:
+        requestVolumeThreshold: 5
+        sleepWindowInMilliseconds: 10000
+      metrics.rollingStats.timeInMilliseconds: 20000
+      execution.isolation:
+        thread.timeoutInMilliseconds: 1000
+        semaphore.maxConcurrentRequests: 10
+    getPartyExtendedProfile:
+      circuitBreaker:
+        requestVolumeThreshold: 5
+        sleepWindowInMilliseconds: 10000
+      metrics.rollingStats.timeInMilliseconds: 20000
+      execution.isolation:
+        thread.timeoutInMilliseconds: 1000
+        semaphore.maxConcurrentRequests: 10
+
+
+In the Java code, where you do the REST call:
+@HystrixCommand(commandKey = "updatePartyCoreProfile",
+        commandProperties = {
+                @HystrixProperty(name = "fallback.enabled", value = "false"),
+                @HystrixProperty(name = "execution.isolation.strategy", value = "SEMAPHORE")
+        })
+public void updatePartyCoreProfile(final PartyCoreProfile partyCoreProfile) {
+    final Map<String, Object> params = singletonMap("partyExtRef", partyCoreProfile.getPartyExtRef());
+    final HttpHeaders requestHeaders = new HttpHeaders();
+    if (nonNull(partyCoreProfile.getUpdatedBy())) {
+        requestHeaders.add("profileRef", partyCoreProfile.getUpdatedBy());
+    }
+    final HttpEntity<PartyCoreProfile> partyCoreProfileRequest = new HttpEntity<>(partyCoreProfile, requestHeaders);
+    try {
+        partyCoreProfileRestTemplate.put("/cpp/security/v1/party/{partyExtRef}",
+                partyCoreProfileRequest,
+                params);
+
+    } catch (HttpClientErrorException | HttpServerErrorException e) {
+        logRequestError("updatePartyCoreProfile", e, partyCoreProfile);
+        throw e;
+    }
+}
+
+
+To see the Hystrix dashboard for your application, open http://hostname:port/hystrix
