@@ -8,6 +8,9 @@
 
 - to build without tests: mvn clean install -DskipTests=true
 
+
+- to display the dependency tree: mvn dependency:tree
+
 				
 - for a standalone Java project: follow tutorial at http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html
 	- to create the project skeleton:
