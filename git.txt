@@ -5,6 +5,14 @@
 	- to add a key to your agent: ssh-add -K ~/.ssh/keyForOns_rsa
 
 
+- to set JAVA_HOME on the command line in GitBash
+	- Problem: my JAVA_HOME is set to jdk1.8.0_20 but this does not exist anymore. And, I am not and Administrator on the machine.
+	- echo $JAVA_HOME
+	C:\Program Files\Java\jdk1.8.0_20
+	- export JAVA_HOME='C:\Program Files\Java\jdk1.8.0_181'
+	- export PATH=$JAVA_HOME/bin:$PATH
+
+
 - to untrack *.iml files (IntelliJ-specific stuff) checked in by error:
 	- cd to the top directory of the project (ie /nfshome/philippe.brossier/code_ctp/beyond-soa-demo)
 	- git rm --cached *.iml
