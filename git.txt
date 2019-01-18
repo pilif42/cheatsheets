@@ -200,3 +200,11 @@ git push -u origin developEndOf18Q31
 
 - To list the configured remote servers:
 git remote -v
+
+
+- To solve issue when cloning a project with long filenames on Windows:
+git config --global core.longpaths true
+
+
+- To locate config files
+git config --list --show-origin
