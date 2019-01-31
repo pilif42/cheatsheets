@@ -12,7 +12,7 @@
 - find some text in all files:
 	- grep -rnw '/path/to/somewhere/' -e "filou"
 		--> -r or -R is recursive
-		--> -n is line number 
+		--> -n is line number
 		--> -w stands match the whole word
 		--> -l (lower-case L) can be added to just give the file name of matching files
 
@@ -20,7 +20,7 @@
 - man followed by a space and any command at a shell prompt.
 		- For example, type man su and the man page for the su command appears.
 		- To scroll forward through the document, press [Space]; to scroll back, press [b]. To quit the document, press [q].
-		
+
 
 - remove a non-empty directory
 		- rm -r yourdir
@@ -28,19 +28,19 @@
 
 - remove a directory without being prompted for anything: rm -r code_perso -f
 
-		
+
 - to find any file *.policy in the current directory or below
 		- find . -name *.policy
 
-		
+
 - to find a directory called apache:
 		- find / -type d -name "apache" 2> /dev/null
 
-		
+
 - to find a file containing the text "mod_proxy_ajp.so":
 		- find . -name “*.*” | xargs grep 'mod_proxy_ajp.so'
 
-		
+
 - amount of free disk space:
 		- df -h
 
@@ -48,20 +48,23 @@
 - find a server's date:
 		- date will give you Thu Feb 17 06:42:54 EST 2011
 
-		
+
 - find which ports are in use:
 		- netstat -pln
-		- if you are after the pid of the process on 8131: netstat -pln | grep 8131 
+		- if you are after the pid of the process on 8131: netstat -pln | grep 8131
+
+
+- list all processes owned by storm: ps -f -u storm
 
 
 - to kill a process (-9 is for force it no matter what):
 		- kill -9 thePID
 
-		
+
 - copy files:
 		- cp *.tif /usr/geoserver/data/data/inspire/50k/
 
-		
+
 - copy a directory, including all its files and subdirectories, to another directory, enter:
      	- cp -R /var/www/html/inspire/2_1_0_3 /var/www/html/inspire/philversion
 
@@ -69,11 +72,11 @@
 - when having issues after having copied a file from windows:
 		- dos2unix filename
 
-		
+
 - replace all occurences of string 46.137.100.142 with 46.137.121.28 in vi:
 		- :1,$s/46.137.100.142/46.137.121.28/
 
-		
+
 - to search the logs for a string (in our case, WARN.*TIMING):
 		- grep 'WARN.*TIMING' application.log | cut -d" " -f"1,6,11,22-"
 
@@ -100,7 +103,7 @@
 		- echo $PATH
 
 
-- to list all services: 
+- to list all services:
 	- systemctl list-unit-files
 
 

@@ -1,0 +1,5 @@
+- Pb to solve: this is to ensure that after each build, we have got a distinct version. Prior to this, our project was building by default 2.3.0-SNAPSHOT and overriding it time and time again.
+To build a .jar 392-SNAPSHOT (where 392 is the build number) and upload it to Nexus:
+In the Jenkins web UI, for your given project/job, click on Configure.
+In the Build section, add an ‘Invoke Gradle script’ section if not present.
+In the Tasks box of the ‘Invoke Gradle script’ section, type: jacoco build sonarqube -Prelease.version=${BUILD_NUMBER}-SNAPSHOT uploadArchives
