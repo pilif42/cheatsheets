@@ -1,9 +1,10 @@
 - If your build fails with gradlew permission, follow the steps below .
 checkout the corresponding branch in your local repository: git checkout "BranchName"
 generate gradle wrapper again using: gradle wrapper
-execute the command:  git update-index --chmod=+x gradlew
+execute the command:
+    - on Unix based systems: chmod +x gradlew
+    - on Windows: git update-index --chmod=+x gradlew
 add the files to staging: git add gradlew gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper. Properties gradlew.bat
 commit the change to local repository: git commit -m "GradlewUpdate"
 push the change to the remote repository: git push origin "BranchName"
 trigger the Jenkins job
- 
