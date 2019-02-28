@@ -208,3 +208,7 @@ git config --global core.longpaths true
 
 - To locate config files
 git config --list --show-origin
+
+
+- To undo a commit when you have not pushed yet:
+git reset HEAD~1
