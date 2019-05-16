@@ -1,0 +1,5 @@
+- https://nifi.apache.org/ instead of Storm if you do not need to do any complex data processing.
+
+- https://hortonworks.com/open-source/streaming-analytics-manager/ to generate your Storm topos without writing code.
+
+- For scenarios using sliding window aggregates: Storm or Spark.

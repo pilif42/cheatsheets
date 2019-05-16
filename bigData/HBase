@@ -1,0 +1,36 @@
+- HBase config parameters:
+
+While testing for the scenario where HBase is down (integration test
+ in the developer’s project with in-memory HBase:
+ org.apache.hadoop.hbase.HBaseTestingUtility), I realised that using
+  the default HBase client settings, the exception thrown while
+  flushing the HBase cache was taking forever to be returned to the
+  client, ie RecoverableZookeeper keeps retrying and as mentioned at
+   http://hadoop-hbase.blogspot.com/2012/09/hbase-client-timeouts.html,
+   it can take up to 20 mins for the exception to come back to the
+   surface.
+
+Then, I amended the settings using the below in hbase-site.xml and I received feedback quickly:
+    <!-- Start of Section to force the client to fail fast when HBase is down for instance. -->
+    <property>
+        <name>hbase.client.retries.number</name>
+        <value>1</value>
+    </property>
+    <property>
+        <name>hbase.client.pause</name>
+        <value>1000</value>
+    </property>
+    <property>
+        <name>zookeeper.recovery.retry</name>
+        <value>1</value>
+    </property>
+    <!-- End of Section to force the client to fail fast when HBase is down for instance. -->
+
+
+- Coprocessor:
+https://blogs.apache.org/hbase/entry/coprocessor_introduction
+
+Interesting read. This was mentioned as a possible solution to ensure that an event coming from the recon topic has reached HBase:
+-1) the event is inserted
+-2) using the coprocessor idea, on insertion, you publish an Ack message to a Kafka topic. The Ack contains the GUID of your event.
+-3) you have a Spark application that reads from source 1 (recon Topic) and from source 2 (ack Topic) and identifies what is missing in the Ack topic.
