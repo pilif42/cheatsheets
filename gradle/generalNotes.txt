@@ -41,3 +41,91 @@ configurations {
 
 - To use a dependency .jar stored locally:
 		- compile files('c:\\tempoLoca\\someDependency.jar')
+
+
+- To publish several artifacts to a Maven-type repo (Nexus or similar):
+The code below was done using Gradle 4.10.
+
+Required plugins as we deal with a Spring Boot app:
+apply plugin: 'java'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+
+To say that you want to publish both the application .jar built by the Spring Boot plugin and the config files .tar built by the distTar task:
+artifacts {
+    archives bootJar
+    archives distTar
+}
+
+And note the addfilter(s) and the pom below. These are mandatory otherwise the Maven plugin will only publish one artifact and will not warn you that it ignores others:
+uploadArchives() {
+    def nxUsername = System.getenv("nexusUsername") ?: "nexusUsernameNotSet"
+    def nxPassword = System.getenv("nexusPassword") ?: "nexusPasswordNotSet"
+
+    repositories.mavenDeployer {
+        repository(url: nexusReleaseRepoURL) {
+            authentication(userName: nxUsername, password: nxPassword)
+        }
+        snapshotRepository(url: nexusSnapshotRepoURL) {
+            authentication(userName: nxUsername, password: nxPassword)
+        }
+        addFilter('jar') {artifact, file ->
+            artifact.ext == 'jar'
+        }
+        addFilter('tar') {artifact, file ->
+            artifact.ext == 'tar'
+        }
+        pom('tar').version = "$version"
+    }
+}
+
+Other way to define your artifacts section:
+def stagingScriptsArtifact = file("$buildDir/distributions/$stagingScriptArtifactId-$projVersion" + ".tar")
+def appArtifact = file("$buildDir/distributions/$projArtifactId-$version" + ".jar")
+artifacts {
+archives stagingScriptsArtifact
+archives appArtifact
+}
+
+This is longer and more brittle as we rely on file names.
+
+
+- To copy the application .jar (built by Spring) to \build\distributions. This needs to be invoked with ./gradlew build copyAppJar. It depends on build as the .jar must be present in \build\libs before it can be copied.
+task copyAppJar(type: Copy) {
+    dependsOn build
+    from file("$buildDir/libs/$projArtifactId-$version" + ".jar")
+    into file("$buildDir/distributions")
+}
+
+
+- To create a tar file in the distributions folder from config files:
+**
+* @param tarName the name of the tar file
+* @param folderToArchive the folder that requires to be archived
+*/
+def createTar(tarName, folderToArchive) {
+    distributions {
+        main {
+            baseName = "${tarName}"
+            contents {
+                from("${folderToArchive}/") {
+                    into("${folderToArchive}")
+                }
+            }
+        }
+    }
+}
+
+// Export methods by turning them into closures
+ext {
+    createTar = this.&createTar
+    getLatestArtifact = this.&getLatestArtifact
+}
+
+task buildStagingScripts(type: Tar) {
+    createTar(stagingScriptArtifactId, "env")
+}
+
+The .tar file will be built during the task distTar (automatically invoked when
+doing ./gradlew build) and will end up in \build\distributions.
