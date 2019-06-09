@@ -1,0 +1,60 @@
+- To start a Spring Boot app:
+
+#!/usr/bin/env bash
+export homeDir=$(pwd)
+export trustStore=${homeDir}/ext-lib/cacerts
+export jwtConfigDir=/jwt/consumer
+
+# Command to execute this shell
+# sh start.sh <APPLICATION_VERSION> <PROFILE_TYPE> <PROFILES_LOAD_FILES>
+# E.g. sh start.sh 28-SNAPSHOT TEST sampleData.xlsx,sampleData_FAILURE_OUTPUT.xlsx
+
+# Script arguments
+APPLICATION_VERSION=$1
+PROFILE_TYPE=$2
+#Comma separated list of input file and failure file. Don't add any space.
+PROFILES_LOAD_FILES=$3
+
+APPLICATION_NAME=sample-springBoot-batch
+
+# Text Colour
+RED="\033[1;31m"          # Red
+GREEN="\033[1;32m"        # Green
+COLOR_OFF="\033[0m"       # Text Reset
+
+printHeader(){
+    message=$1
+    echo -e "\n\n${GREEN}${message}${COLOR_OFF}"
+}
+
+printHeader "####### STARTING APPLICATION ########"
+
+if [[ $# -ne 3 ]]; then
+echo -e "\n${RED}
+This start script requires 4 arguments to run:
+  1> APPLICATION_VERSION                : Only the version of the artifact (in this case .jar) eg. 0.24.0
+  2> PROFILE_TYPE                       : The type of user to be loaded. For example: TEST
+  3> PROFILES_LOAD_FILE                 : Full Path to the user profile xlsx file and failure file separated by comma.
+                                          For example, sampleData.xlsx,sampleData_FAILURE_OUTPUT.xlsx
+
+  Refer to the GitHub release note for more information.
+  ${COLOR_OFF}"
+
+  exit 1
+fi
+
+echo "variable APPLICATION_VERSION is \"${APPLICATION_VERSION}\"
+variable PROFILE_TYPE is \"${PROFILE_TYPE}\"
+variable PROFILES_LOAD_FILE is \"${PROFILES_LOAD_FILES}\"
+variable APPLICATION_NAME is \"${APPLICATION_NAME}\"
+";
+
+/usr/java/default/bin/java \
+-Dspring.config.location=${homeDir}/ext-lib/application.properties \
+-Dapp_JWT_KEYSTORE=${jwtConfigDir}/app_keystore.jceks \
+-Dapp_JWT_KEYSTORE_PWD=${jwtConfigDir}/app_keystore.properties \
+-Dapp_JWT_CFG_FILE=${homeDir}/ext-lib/jwtGeneratorCfg.json \
+-Djavax.net.ssl.trustStore=${trustStore} \
+-jar ${APPLICATION_NAME}-${APPLICATION_VERSION}.jar \
+${PROFILE_TYPE} \
+${PROFILES_LOAD_FILES}

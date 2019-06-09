@@ -129,3 +129,21 @@ task buildStagingScripts(type: Tar) {
 
 The .tar file will be built during the task distTar (automatically invoked when
 doing ./gradlew build) and will end up in \build\distributions.
+
+
+- To ensure that the gradle wrapper is present so that people do not need to
+download Gradle:
+
+In build.gradle, add:
+allprojects {
+    group "${projGroupId}"
+    version "${projVersion}"
+    task wrapper(type: Wrapper) {
+        gradleVersion = "${gradleDistVersion}"
+        distributionUrl = "${gradleDistributionHost}/content/groups/public/org/gradle/gradle/${gradleVersion}/gradle-${gradleVersion}-all.zip"
+    }
+}
+
+And in gradle.properties, add:
+projGroupId=com.sample
+projVersion=1.0.0

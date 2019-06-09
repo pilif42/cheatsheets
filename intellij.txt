@@ -9,14 +9,14 @@
 	- from /opt/idea-IC-143.1821.5/bin:
 		- ./idea.sh
 	- now delete the old version
-	
 
-- font size (sur Mac, acces a ces menus avec ToucheMac + ,): 
+
+- font size (sur Mac, acces a ces menus avec ToucheMac + ,):
 	- Settings > Appearance & Behaviour > Appearance > tick Override default fonts and bump up to 17
 	- Scroll with the mouse: Settings > Editor > General > tick box mentioning mouse wheel
 
 
-- maven setup: 
+- maven setup:
 	- Settings > Build, Execution, Deployment > Build tools > Maven > Repositories and add location of the local one.
 
 
@@ -34,7 +34,7 @@
 --spring.cloud.config.password=qx6wAL7#CKqz=T
 --spring.cloud.config.label=csp
 
-		
+
 - to connect to a database:
 		- select the Database tab on the right hand side
 		- select the green + and Data Source and then the type Mysql or else
@@ -52,3 +52,28 @@
 	- Ctrl + Shift + Alt + S
 	- Project Settings --> Project --> Project SDK + Project Language Level
 	- Project Settings --> Modules --> Sources tab + Language level
+
+
+- Example of an IntelliJ Spring Boot running config:
+Inside the IntelliJ project, create the file ./idea/runConfigurations/SpringBootConsoleApplication.xml with the content below:
+
+<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="SpringBootConsoleApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+        <module name="sampleApp_main" />
+        <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea">
+           <pattern>
+                <option name="PATTERN" value="com.sample.*" />
+                <option name="ENABLED" value="true" />
+            </pattern>
+        </extension>
+        <option name="SPRING_BOOT_MAIN_CLASS" value="com.sample.SpringBootConsoleApplication" />
+        <option name="VM_PARAMETERS" value="-Dspring.config.location=env/local/ext-lib/application.properties -DsampleApp_JWT_CFG_FILE=env/local/ext-lib/jwtGeneratorCfg.json -DsampleApp_JWT_KEYSTORE=env/local/ext-lib/sampleApp_keystore.jceks -DsampleApp_JWT_KEYSTORE_PWD=env/local/ext-lib/sampleApp_keystore.properties -Djavax.net.ssl.trustStore=env/_common/ext-lib/cacerts" />
+        <option name="PROGRAM_PARAMETERS" value="TEST env/local/sampleDataToLoad.xlsx,env/local/sampleDataToLoad_FAILURE_OUTPUT.xlsx" />
+        <option name="ALTERNATIVE_JRE_PATH" />
+        <module name="sampleApp_main" />
+        <envs />
+        <method />
+    </configuration>
+</component>
+
+In the Run menu, Run ‘SpringBootConsoleApplication’ will appear. All ready to be used as is by anyone cloning the project.
