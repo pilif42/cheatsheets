@@ -1,0 +1,21 @@
+Amount of data processed each day in PROD:
+      - 30 million events
+      - 175 million indexes
+      - Both are currently loaded onto Kafka topics via batch
+      processes (ie Spring Boot apps reading files).
+
+
+Kafka setup in PROD: 3 Kafka brokers and only 1 partition per topic. This limit of 1 has been spotted by the Hortonworks consultants as a bad bottleneck. It should be increased but be aware that:
+      - More partitions mean more files opened -> more memory requirement.
+      - More parallelism means more processing -> more memory requirement.
+
+
+To verify the performance of a Storm topology, open the Storm UI and check in the following order:
+      - Kafka Spouts lag.
+      - Processing times at each bolt.
+      - Capacity of each bolt. The maximum figure is 1. The recommended figure by Hortonworks is 0.85.
+
+
+To improve the performance of a Storm topology, do the following one step at a time. After each step, you need to restart your topology and verify the capacity of each bolt (is it closer to .85?):
+      - Add more partitions to the Kafka topic our Storm app reads from.
+      - Increase topology.max.spout.pending. The default value is 1000 and it means that the Kafka spout reads 1000 messages at a time.
