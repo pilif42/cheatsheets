@@ -147,3 +147,17 @@ allprojects {
 And in gradle.properties, add:
 projGroupId=com.sample
 projVersion=1.0.0
+
+
+- To force a specific version for a transitive dependency. In this example, we
+ensure that only version 1.2.5 of my-extractor-lib is used, even if another
+stated dependency (com.sample:avro-utils) references version 1.2.6 of
+my-extractor-lib:
+configurations.all {
+    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+        if (details.requested.name.contains(‘my-extractor-lib')) {
+            details.useTarget 'com.sample:my-extractor-lib:1.2.5'
+        }
+    }
+}
+ 
