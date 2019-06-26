@@ -3,3 +3,12 @@ To build a .jar 392-SNAPSHOT (where 392 is the build number) and upload it to Ne
 In the Jenkins web UI, for your given project/job, click on Configure.
 In the Build section, add an ‘Invoke Gradle script’ section if not present.
 In the Tasks box of the ‘Invoke Gradle script’ section, type: jacoco build sonarqube -Prelease.version=${BUILD_NUMBER}-SNAPSHOT uploadArchives
+
+
+- https://www.cloudbees.com/blog/getting-started-blue-ocean
+With an https://www.ansible.com/ pipeline.
+      # Installation Instruction using the Jenkins pipeline (preferred option)
+      Go to the [Jenkins job](https://jenkins.sample.com/job/myapp/job/release-v1.0.0/1/)
+      Click the 'Checkpoints' link (on the left hand-side). Click the 'Restart from this checkpoint' link on the line 'Successfully completed stage build test'.
+      Switch to the Open Blue Ocean view (see link on the left-hand side). Click on the 'release-v1.0.0' link .
+      The pipeline job will pause with 'User Input Is Required'. Select the environment to deploy to (sit, etc.). Select version '1.0.0-RELEASE' and click on Proceed.
