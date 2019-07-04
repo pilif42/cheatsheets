@@ -160,4 +160,17 @@ configurations.all {
         }
     }
 }
- 
+
+
+- Lombok and Gradle 4.10
+We use: Gradle 4.10.3 via its wrapper.
+
+We were importing Lombok (in various libs) with:
+compile 'org.projectlombok:lombok:1.18.8'
+
+These libs are used in our Storm project. Its cmd line build was failing with:
+Could not instantiate annotation processor 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'
+
+Solution = declare the Lombok dependency with the below:
+compileOnly 'org.projectlombok:lombok:1.18.8'
+annotationProcessor 'org.projectlombok:lombok:1.18.8'
