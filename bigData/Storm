@@ -19,3 +19,53 @@ To verify the performance of a Storm topology, open the Storm UI and check in th
 To improve the performance of a Storm topology, do the following one step at a time. After each step, you need to restart your topology and verify the capacity of each bolt (is it closer to .85?):
       - Add more partitions to the Kafka topic our Storm app reads from.
       - Increase topology.max.spout.pending. The default value is 1000 and it means that the Kafka spout reads 1000 messages at a time.
+
+
+To install and start topologies:
+      - ssh into the Edge node and cd /home/app/
+      - wget -O install.tar "https://nexus.sample.com:8443/service/local/artifact/maven/redirect?r=snapshots&g=com.sample&a=storm-ingest&v=1.0.857-SNAPSHOT&p=tar"
+      - tar -xvf install.tar
+      - rm install.tar
+      - cd storm-ingest-1.0.857-SNAPSHOT
+      - ./deploy.sh
+      - Amend the event topology name to sth easy to track
+            - cd storm-event-ingest-1.0.857-SNAPSHOT
+            - cd ext-lib
+            - vi configArgs.yaml
+      - Amend the index topology name to sth easy to track
+            - cd ../../storm-index-ingest-1.0.857-SNAPSHOT
+            - cd ext-lib
+            - vi configArgs.yaml
+      - Verify all running topos: storm list
+      - Kill running topos if required:
+            - cd /home/app/
+            - sh topology_cleanup.sh <Topo_ID> <Topo_Name>
+            - or:
+                  - storm kill event_topology
+                  - storm kill index_topology
+      - Start the event topo:
+            - cd storm-event-ingest-1.0.857-SNAPSHOT
+            - ./start.sh
+
+
+- Storm issue when using Java 9 classes
+    - Version of Storm: from within HDP 2.6.5, ie 1.1.0.2.6.5.41-2
+    - Issue when starting the topology in the edge node:
+          Exception in thread "main" java.lang.IllegalArgumentException
+          at org.apache.storm.hack.shade.org.objectweb.asm.ClassReader.<init>(Unknown Source)
+          at org.apache.storm.hack.shade.org.objectweb.asm.ClassReader.<init>(Unknown Source)
+          ….
+          Error: Could not find or load main class com.sample.storm.EventIngestStormTopology
+    - Solution: revert Lombok from 1.18.8 to 1.16.20
+    - Reason: The Hortonworks installation of storm is configured by default to perform transformation of class files in legacy jars during topology submission. The transformation step is controlled by a property in storm.yaml with the key client.jartransformer.class and the default value for Hortonworks is org.apache.storm.hack.StormShadeTransformer
+      This transformation step uses the ASM library to package-relocate classes built against legacy version of storm (predating 1.0). The version of ASM that is used to do this only supports class files built against Java 8 and earlier. If a topology jar contains a class with a version of Java 9 or newer, the transformation step will fail with the following output.
+      Exception in thread "main" java.lang.IllegalArgumentException
+      at org.apache.storm.hack.shade.org.objectweb.asm.ClassReader.<init>(Unknown Source)
+      at org.apache.storm.hack.shade.org.objectweb.asm.ClassReader.<init>(Unknown Source)
+      at org.apache.storm.hack.shade.org.objectweb.asm.ClassReader.<init>(Unknown Source)
+      Java 9 introduced a new feature called Multi-Release JAR Files under JEP 238 http://openjdk.java.net/jeps/238 and recent versions of libraries such as ElasticSearch have started to build multi-release jars that contain classes with versions newer than Java 9. Due to the aformentioned lack of support for Java 9 and newer, the transformation step fails and prevents the submission of topologies.
+      Storm can be configured to skip the transformation step by either removing the client.jartransformer.class from storm.yaml or setting its value to 'nil'. The former does not appear to be possible with Hortonworks distributions since a non-empty value is required.
+      https://gitlab.ow2.org/asm/asm/blob/ASM_5_0_2/src/org/objectweb/asm/ClassReader.java#L169-17
+      https://github.com/hortonworks/storm-release/blob/HDP-2.6.5.3008-9-tag/bin/storm.py#L308
+      I am recommending setting the value to 'nil' in future ACS releases to support topologies that have dependencies on multi-release jars.
+      In our case, so we do not have to modify the Storm set up, I reverted to an older version of Lombok as it was good enough for what we needed to achieve at the time.
