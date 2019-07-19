@@ -69,3 +69,11 @@ To install and start topologies:
       https://github.com/hortonworks/storm-release/blob/HDP-2.6.5.3008-9-tag/bin/storm.py#L308
       I am recommending setting the value to 'nil' in future ACS releases to support topologies that have dependencies on multi-release jars.
       In our case, so we do not have to modify the Storm set up, I reverted to an older version of Lombok as it was good enough for what we needed to achieve at the time.
+
+
+- To verify which classes are part of your uber jar:
+     jar tf my-storm-app-1.0.0-SNAPSHOT-repackaged.jar > tempo.txt
+
+
+- Location of properties files relied upon by libraries added as compile dependencies:
+    - When I explode my-storm-app-1.0.0-SNAPSHOT-repackaged.jar, these props files (kafka.producer.default.properties, event-config.yml, etc.) are directly at the root.
