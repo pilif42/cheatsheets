@@ -1,0 +1,52 @@
+To ensure that both unit tests and developer’s integration tests are taken
+ into account while working out the test coverage.
+
+Create a file called sonarqube.gradle with:
+/**
+* Configurations for SonarQube
+*/
+def sonarqubeURL = "https://sonarqube2.myorganisation.com"
+
+sonarqube {
+    properties {
+        property "sonar.projectKey", "${project.group}:${project.name}"
+        property "sonar.projectName", "${project.name}"
+        property "sonar.scm.provider", "git"
+        property "sonar.language", "java"
+        property "sonar.junit.reportsPath", "${project.buildDir}/test-results"
+        property "sonar.jacoco.reportPaths", "${project.buildDir}/jacoco/test.exec,${project.buildDir}/jacoco/integrationTest.exec"
+        property "sonar.java.source", "1.8"
+        property "sonar.java.target", "1.8"
+        property "sonar.sourceEncoding", "UTF-8"
+        property "sonar.projectVersion", "${project.version}"
+        property "sonar.host.url", sonarqubeURL
+        property "sonar.exclusions", "**/build/**/*.java,/**/swagger/**/*.java,/**/vo/**/*.java"
+    }
+}
+
+
+In the project’s build.gradle :
+apply from: 'sonarqube.gradle'
+
+and
+
+check.dependsOn integrationTest
+integrationTest.mustRunAfter test
+
+where
+
+task integrationTest(type: Test) {
+    testClassesDir = sourceSets.integrationTest.output.classesDir
+    classpath = sourceSets.integrationTest.runtimeClasspath
+}
+
+And
+
+sourceSets {
+    integrationTest {
+      java {
+            // Adding java/main & test/main code to use in the Integration test
+            compileClasspath += main.output + test.output
+      }
+    }
+}
