@@ -131,6 +131,11 @@ The .tar file will be built during the task distTar (automatically invoked when
 doing ./gradlew build) and will end up in \build\distributions.
 
 
+- To get a specific wrapper's version:
+gradle wrapper --gradle-version 4.10.3
+		--> this will generate gradle-wrapper.jar and gradle-wrapper.properties under \gradle\wrapper.
+
+
 - To ensure that the gradle wrapper is present so that people do not need to
 download Gradle:
 
