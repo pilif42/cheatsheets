@@ -1,0 +1,15 @@
+- Configure a restTemplate:
+
+On the class: @Configuration
+
+@Bean
+@LoadBalanced
+public RestTemplate myRestTemplate(final RestTemplateBuilder restTemplateBuilder,
+                                  final LoggingRequestInterceptor loggingRequestInterceptor,
+                                  @Value("${client.host}") final String serviceHost) {
+    LOGGER.debug("serviceHost is {}", serviceHost);
+    return restTemplateBuilder
+            .rootUri(serviceHost)
+            .additionalInterceptors(loggingRequestInterceptor)
+            .build();
+}

@@ -1,0 +1,19 @@
+- Endpoints should not be vulnerable to reflected cross-site scripting (XSS)
+attacks:
+
+import org.owasp.encoder.Encode;
+
+and
+
+@RequestMapping(value = "${endpoint.resource.path}", method = RequestMethod.POST, produces = MediaTypes.HAL_JSON_VALUE)
+public ResponseEntity<ResourceCreateResponse> createResource(@Valid @RequestBody ResourceCreateRequest request, HttpServletRequest httpServletRequest) {
+  GemfireObject gemfireObject = resourceService.createNewResource(request);
+  String resourceId = gemfireObject.getResourceId();
+  resourceId = Encode.forHtml(resourceId);
+  ResourceCreateResponse resourceCreateResponse = new ResourceCreateResponse(resourceId);
+  resourceCreateResponse.add(new Link(httpServletRequest.getRequestURL().append("/" + resourceId).toString()));
+  return ResponseEntity
+          .created(URI.create(httpServletRequest.getRequestURI() + "/" + resourceId))
+          .eTag(gemfireObject.getVersion())
+          .body(resourceCreateResponse);
+}
