@@ -1,13 +1,27 @@
-- Configure a restTemplate:
+- Configure a restTemplate: we define 2 beans (1 for local runs without Eureka,
+1 for Cloud runs with Eureka: see @LoadBalanced)
 
 On the class: @Configuration
 
 @Bean
 @LoadBalanced
+@ConditionalOnProperty(name = "eureka.client.enabled", havingValue = "true")
 public RestTemplate myRestTemplate(final RestTemplateBuilder restTemplateBuilder,
                                   final LoggingRequestInterceptor loggingRequestInterceptor,
                                   @Value("${client.host}") final String serviceHost) {
     LOGGER.debug("serviceHost is {}", serviceHost);
+    return restTemplateBuilder
+            .rootUri(serviceHost)
+            .additionalInterceptors(loggingRequestInterceptor)
+            .build();
+}
+
+@Bean(name="myRestTemplate")
+@ConditionalOnProperty(name = "eureka.client.enabled", havingValue = "false")
+public RestTemplate localMyRestTemplate(final RestTemplateBuilder restTemplateBuilder,
+                                        final LoggingRequestInterceptor loggingRequestInterceptor,
+                                        @Value("${client.host}") final String serviceHost) {
+    LOGGER.debug("No Eureka. serviceHost is {}", serviceHost);
     return restTemplateBuilder
             .rootUri(serviceHost)
             .additionalInterceptors(loggingRequestInterceptor)
