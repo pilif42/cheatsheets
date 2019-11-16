@@ -1,0 +1,18 @@
+- To get a hbase shell:
+ssh myserver.com
+dzdo su - specific_username
+hbase shell
+
+
+- While using a HBase command, if you encounter the exception
+Caused by: GSSException: No valid credentials provided (Mechanism level: Failed
+to find any Kerberos tgt):
+quit the hbase shell
+cd /home/specific_username/.keytab/
+kinit -kt specific_username.keytab specific_username@myserver.com
+klist -> to verify all is OK
+
+
+- Sample commands (after a hbase shell):
+    - to list all tables: list
+    - to verify that the table events exists: exists 'events'
