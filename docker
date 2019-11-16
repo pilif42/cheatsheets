@@ -1,12 +1,25 @@
+- to install on Ubuntu:
+sudo apt-get remove docker docker-engine docker.io
+sudo apt install docker.io
+    - reason we went for docker.io and not docker.ce:
+          - docker.io does it the Debian (or Ubuntu) way: Each external dependency is a
+          separate package that can and will be updated independently.
+          - docker-ce does it the Golang way: All dependencies are pulled into the source
+          tree before the build and the whole thing forms one single package afterwards.
+          So you always update docker with all its dependencies at once.
+          - The problem with the latter approach is that it goes against much of what
+          Debian/Ubuntu are trying to do.
+
+
 - to start all existing containers in the background:
-copy docker-compose-dev_env.yml and docker-compose-services.yml from rm-docker-dev to /Users/philippebrossier/devtools/rmdockerdev 
+copy docker-compose-dev_env.yml and docker-compose-services.yml from rm-docker-dev to /Users/philippebrossier/devtools/rmdockerdev
 cd /Users/philippebrossier/devtools/rmdockerdev
 docker login
 sdcplatform / xxx
-docker-compose -f docker-compose-dev_env.yml pull 
-docker-compose -f docker-compose-dev_env.yml up -d  
+docker-compose -f docker-compose-dev_env.yml pull
+docker-compose -f docker-compose-dev_env.yml up -d
 docker-compose -f docker-compose-services.yml pull
-docker-compose -f docker-compose-services.yml up -d  
+docker-compose -f docker-compose-services.yml up -d
 
 
 - to delete all containers:
