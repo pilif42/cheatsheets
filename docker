@@ -1,14 +1,37 @@
-- to install on Ubuntu:
-sudo apt-get remove docker docker-engine docker.io
-sudo apt install docker.io
-    - reason we went for docker.io and not docker.ce:
-          - docker.io does it the Debian (or Ubuntu) way: Each external dependency is a
-          separate package that can and will be updated independently.
-          - docker-ce does it the Golang way: All dependencies are pulled into the source
-          tree before the build and the whole thing forms one single package afterwards.
-          So you always update docker with all its dependencies at once.
-          - The problem with the latter approach is that it goes against much of what
-          Debian/Ubuntu are trying to do.
+- to install Docker on Ubuntu & verify it:
+    - Update Software Repositories: sudo apt-get update
+    - Uninstall old versions of Docker: sudo apt-get remove docker docker-engine docker.io
+    - Remove Docker files: sudo rm -rf /var/lib/docker
+    - Install Docker:
+            - sudo apt install docker.io
+                  - reason we went for docker.io and not docker.ce:
+                        - docker.io does it the Debian (or Ubuntu) way: Each external dependency is a
+                        separate package that can and will be updated independently.
+                        - docker-ce does it the Golang way: All dependencies are pulled into the source
+                        tree before the build and the whole thing forms one single package afterwards.
+                        So you always update docker with all its dependencies at once.
+                        - The problem with the latter approach is that it goes against much of what
+                        Debian/Ubuntu are trying to do.
+                  - output:
+                        Unpacking docker.io (19.03.2-0ubuntu1) ...
+                        Setting up docker.io (19.03.2-0ubuntu1) ...
+                        docker.service is a disabled or a static unit, not starting it.
+                        Job failed. See "journalctl -xe" for details.
+    - Start and Automate Docker: The Docker service needs to be setup to run at startup.
+            - sudo systemctl start docker
+                  - output: Failed to start docker.service: Unit docker.service is masked.
+                  - solution:
+                        sudo systemctl unmask docker.service
+                        sudo systemctl unmask docker.socket
+                        sudo systemctl start docker.service
+                        sudo systemctl enable docker
+    - Verify the install: sudo docker --version
+
+
+- to install Docker Compose on Ubuntu & verify it:
+sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose --version
 
 
 - to start all existing containers in the background:
