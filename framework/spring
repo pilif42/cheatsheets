@@ -125,7 +125,7 @@ public void updatePartyCoreProfile(final PartyCoreProfile partyCoreProfile) {
     }
     final HttpEntity<PartyCoreProfile> partyCoreProfileRequest = new HttpEntity<>(partyCoreProfile, requestHeaders);
     try {
-        partyCoreProfileRestTemplate.put("/cpp/security/v1/party/{partyExtRef}",
+        partyCoreProfileRestTemplate.put("/security/v1/party/{partyExtRef}",
                 partyCoreProfileRequest,
                 params);
 
@@ -137,3 +137,123 @@ public void updatePartyCoreProfile(final PartyCoreProfile partyCoreProfile) {
 
 
 To see the Hystrix dashboard for your application, open http://hostname:port/hystrix
+
+
+- Spring Integration test with @Sql:
+
+Annotate your test class with:
+@RunWith(SpringRunner.class)
+@ContextConfiguration(classes = {ApplicationTestConfig.class, ExpandHierarchyServiceImplTest.PartyHierarchyServiceTestConfig.class, JacksonAutoConfiguration.class})
+@TestPropertySource(locations = "classpath:/application-test.yml")
+
+Where:
+
+@Configuration
+@ComponentScan(basePackages = {"com.sample.partyhierarchy.service", "com.sample.partyhierarchy.repository", "com.sample.partyhierarchy.jpa", "com.sample.party.services.mappers"})
+public static class PartyHierarchyServiceTestConfig {
+}
+
+And:
+
+import ch.vorburger.exec.ManagedProcessException;
+import ch.vorburger.mariadb4j.DB;
+import ch.vorburger.mariadb4j.springframework.MariaDB4jSpringService;
+...
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.datasource.SimpleDriverDataSource;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.JpaVendorAdapter;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+
+import javax.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
+import java.sql.Driver;
+
+@TestConfiguration
+@EnableJpaRepositories(basePackageClasses = {PartyRepository.class, PartyHierarchyRepository.class, UserRepository.class, UserPartyRepository.class})
+@EntityScan(basePackages = "com.sample.partyhierarchy.jpa")
+@Import({DataSourceAutoConfiguration.class, JdbcTemplateAutoConfiguration.class, HibernateJpaAutoConfiguration.class})
+public class ApplicationTestConfig {
+    @Lazy
+    private PartyRepository partyRepository;
+
+    @Lazy
+    private PartyHierarchyRepository partyHierarchyRepository;
+
+    @Bean
+    public MariaDB4jSpringService mariaDB4jSpringService() throws ManagedProcessException {
+        return new MariaDB4jSpringService();
+    }
+
+    @Bean
+    public DB db(@Autowired MariaDB4jSpringService mariaDB4jSpringService) throws ManagedProcessException {
+        DB db = mariaDB4jSpringService.getDB();
+        db.createDB("partyhierarchy");
+        db.source("sql/party_hierarchy_initial_create.sql", "root", null, "partyhierarchy");
+        db.source("sql/schema_update_2.sql", "root", null, "partyhierarchy");
+        db.source("sql/schema_update_5.sql", "root", null, "partyhierarchy");
+        db.source("sql/schema_update_7.sql", "root", null, "partyhierarchy");
+
+        return db;
+    }
+
+    @Bean
+    @DependsOn("db")
+    public DataSource dataSource(@Value("${spring.datasource.driver-class-name}") String dataSourceClassName,
+                                 @Autowired MariaDB4jSpringService mariaDB4jSpringService,
+                                 @Value("${spring.datasource.username}") String username) throws Exception {
+        SimpleDriverDataSource dataSource = new SimpleDriverDataSource();
+        dataSource.setDriverClass((Class<Driver>) Class.forName(dataSourceClassName));
+        dataSource.setUrl(mariaDB4jSpringService.getConfiguration().getURL("partyhierarchy"));
+        dataSource.setUsername(username);
+
+        return dataSource;
+    }
+
+    @Bean
+    @DependsOn("dataSource")
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(@Autowired DataSource dataSource) {
+        LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
+        em.setDataSource(dataSource);
+        em.setPackagesToScan("com.sample.partyhierarchy");
+
+        JpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
+        em.setJpaVendorAdapter(vendorAdapter);
+
+        return em;
+    }
+
+    @Bean
+    public PlatformTransactionManager transactionManager(@Autowired EntityManagerFactory emf) {
+        JpaTransactionManager transactionManager = new JpaTransactionManager();
+        transactionManager.setEntityManagerFactory(emf);
+
+        return transactionManager;
+    }
+
+    @Bean
+    LocalValidatorFactoryBean validator() {
+        return new LocalValidatorFactoryBean();
+    }
+}
+
+And annotate your test with:
+
+@Test
+@Sql("/partyHierarchy/sql/datasetX.sql")
+@Sql(scripts = "/partyHierarchy/sql/deleteData.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+public void testAllHierarchiesDatasetX() throws Exception {
