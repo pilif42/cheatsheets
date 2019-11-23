@@ -257,3 +257,29 @@ And annotate your test with:
 @Sql("/partyHierarchy/sql/datasetX.sql")
 @Sql(scripts = "/partyHierarchy/sql/deleteData.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 public void testAllHierarchiesDatasetX() throws Exception {
+
+
+- Spring MVC Streaming:
+Baeldung reference at https://www.baeldung.com/spring-mvc-sse-streams
+
+@GetMapping("/expandRootNode")
+public StreamingResponseBody expandAllRootNodes(@RequestAttribute(value = EFFECTIVE_DATE_HEADER, required = false) Date effDate) {
+        log.info("Entering expandAllRootNodes");
+        return out -> hierarchyService.expandAllRootNodes(out, effDate);
+}
+
+@GetMapping("")
+public StreamingResponseBody getAllPartyHierarchies(@RequestParam(name = "externalIds", required = false) String externalIds,
+        @RequestAttribute(value = EFFECTIVE_DATE_HEADER, required = false) Date effDate) {
+        log.info("Entering getAllPartyHierarchies");
+        if (!StringUtils.isBlank(externalIds)) {
+            Set<String> externalIdSet = new HashSet<>(Arrays.asList(externalIds.split("\\s*,\\s*")));
+            return out -> hierarchyService.getHierarchyByPartyExtRef(out, externalIdSet, effDate);
+        }
+
+        return hierarchyService::getAllPartyHierarchies;
+}
+
+Where the interface HierarchyService contains:
+void expandAllRootNodes(OutputStream out, final Date effectiveDate) throws IOException;
+void getAllPartyHierarchies(OutputStream out) throws IOException;
