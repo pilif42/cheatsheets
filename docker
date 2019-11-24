@@ -57,7 +57,7 @@ docker rm <CONTAINER_NAME>
 
 
 - to stop all Confluent containers and prune the Docker system freeing up disk space:
-sudo docker container stop $(docker container ls -a -q -f "label=io.confluent.docker") && docker system prune -a -f --volumes
+sudo docker container stop $(sudo docker container ls -a -q -f "label=io.confluent.docker") && sudo docker system prune -a -f --volumes
 
 
 - to create a RabbitMQ container:
