@@ -31,7 +31,7 @@
 - to install Docker Compose on Ubuntu & verify it:
 sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
-docker-compose --version
+sudo docker-compose --version
 
 
 - to start all existing containers in the background:
@@ -54,6 +54,10 @@ docker-compose -f docker-compose-dev_env.yml rm
 - to delete a specific container:
 docker stop <CONTAINER_NAME>
 docker rm <CONTAINER_NAME>
+
+
+- to stop all Confluent containers and prune the Docker system freeing up disk space:
+sudo docker container stop $(docker container ls -a -q -f "label=io.confluent.docker") && docker system prune -a -f --volumes
 
 
 - to create a RabbitMQ container:
