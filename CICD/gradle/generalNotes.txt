@@ -13,16 +13,23 @@ test {
 }
 
 
-- To exclude a dependency added in compile and that causes an issue in test at runtime:
+- To exclude a module added in compile and that causes an issue in test at runtime:
 configurations {
     testRuntime.exclude group: 'org.springframework.cloud', module: 'spring-cloud-starter-netflix-eureka-client'
 }
 
 
-- To exclude a dependency added in compile and that causes an issue in test at compiletime:
+- To exclude a module added in compile and that causes an issue in test at compiletime:
 configurations {
     testCompile.exclude group: 'javax.ws.rs', module: 'jsr311-api'
 }
+
+
+- To exclude a module only from a few dependencies:
+def withoutLog4j = {
+    exclude group: "org.apache.logging.log4j", module: "log4j-to-slf4j"
+}
+compile "org.springframework.boot:spring-boot-starter-web", withoutLog4j
 
 
 - To use a class belonging to project_A in src/test in a project_B:
