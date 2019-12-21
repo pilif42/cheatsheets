@@ -1,0 +1,52 @@
+Using a Spring app to drive your Cuke tests:
+
+The Cuke runner:
+
+@RunWith(Cucumber.class)
+@CucumberOptions(plugin = {
+        "html:target/cucumber-test-report",
+        "json:target/cucumber-test-report.json",
+        "pretty:target/cucumber-test-pretty.txt",
+        "junit:target/cucumber-test-result.xml"},
+        monochrome = true,
+        features = "src/test/resources",
+        glue = {"classpath:com.sample.qa"},
+        tags = {"@Regression"}
+)
+public class ApiLoaderTestRunner {
+}
+
+
+The Spring application:
+
+@EnableDiscoveryClient
+@SpringBootApplication
+@EnableRetry
+public class QAApplication {
+    public static void main(String[] args) {
+        new SpringApplicationBuilder(QAApplication.class).web(WebApplicationType.NONE).run(args);
+    }
+}
+
+
+The glue code:
+
+@ContextConfiguration(classes = QAApplication.class, loader = SpringBootContextLoader.class)
+public class ApiLoaderAutomationStepDefinitions {
+@Before
+public void setUp(final Scenario scenario) throws IOException {
+    if (!environmentSetupHelper.isSetup()) {
+        initialSetup();
+    }
+    this.scenario = scenario;
+    scenarioData = ScenarioData.getInstance();
+    clearDirectory();
+}
+
+
+And in ApiLoaderAutomationStepDefinitions, define:
+
+@When("^the loader has been started$")
+public void loaderIsBeingStarted() throws CustomException, IOException {
+    stepImplementation.validateApiLoad();
+}
