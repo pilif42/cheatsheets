@@ -58,3 +58,79 @@ variable APPLICATION_NAME is \"${APPLICATION_NAME}\"
 -jar ${APPLICATION_NAME}-${APPLICATION_VERSION}.jar \
 ${PROFILE_TYPE} \
 ${PROFILES_LOAD_FILES}
+
+
+- Another script used to start a Spring Boot app:
+
+A sample usage is:
+cd /home/fba/api-loader/devint/api-loader-2.2.0-SNAPSHOT
+sh /home/fba/api-loader/devint/api-loader-2.2.0-SNAPSHOT/api-loader.sh -u eurekaUsername -p eurekaPassword -e devint -s serviceName -d /home/fba/api-loader/devint/api-loader-2.2.0-SNAPSHOT/input/serviceData.xlsx
+
+The script is:
+#!/usr/bin/env bash
+
+# The next line returns: /home/fba/api-loader/devint/api-loader-2.2.0-SNAPSHOT
+export homeDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# The next line returns: api-loader-2.2.0-SNAPSHOT
+export jarName="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd | xargs basename )"
+export jwtConfigLoc=/sys_api/consumer
+
+usage() {
+  echo "Usage: sh full_path_to_api-loader.sh -u eurekaUsername -p eurekaPassword -e environmentName -s serviceName -d fullPathToDataFileToBeLoaded"
+  exit 0;
+}
+
+# The next line verifies that parameters were provided to the script.
+[ $# -eq 0 ] && usage
+
+while getopts "u:p:e:s:d:" o; do
+  case "${o}" in
+    u) # Specify Eureka username
+      eurekaUser=${OPTARG}
+      ;;
+    p) # Specify Eureka password
+      eurekaPass=${OPTARG}
+     ;;
+    e) # Specify environmentName
+      env=${OPTARG}
+      ;;
+    s) # Specify the service
+      service=${OPTARG}
+      ;;
+    d) # Specify the datafile
+      datafile=${OPTARG}
+      ;;
+    h | *) # Display help
+      usage
+      ;;
+  esac
+done
+
+# Verify that all parameters are set.
+[[ -z "${eurekaUser}" || -z "${eurekaPass}"  || -z "${env}"  || -z "${service}"  || -z "${datafile}" ]] && usage
+
+echo "Spring profile is " ${env}
+
+# Identify and set environment specific keystore files
+if [[ "$env" =~ ^(dev|devint|sit)$ ]]; then
+JAVA_OPTS="${JAVA_OPTS} -Deureka.credentials="${eurekaUser}:${eurekaPass}" -Djavax.net.ssl.trustStore=${homeDir}/cacerts\
+  -Dapi_loader_JWT_KEYSTORE=${jwtConfigLoc}/api_loader-DEV_Keystore.jceks\
+  -Dapi_loader_JWT_KEYSTORE_PWD=${jwtConfigLoc}/api_loader-DEV_keystore.properties"
+else
+if [[ "$env" =~ ^(cert|prod)$ ]]; then
+   JAVA_OPTS="${JAVA_OPTS} -Deureka.credentials="${eurekaUser}:${eurekaPass}" -Djavax.net.ssl.trustStore=${homeDir}/cacerts\
+    -Dapi_loader_JWT_KEYSTORE=${jwtConfigLoc}/api_loader-PROD_Keystore.jceks\
+    -Dapi_loader_JWT_KEYSTORE_PWD=${jwtConfigLoc}/api_loader-PROD_keystore.properties"
+fi
+fi
+
+echo "Using JAVA_OPTS: ${JAVA_OPTS}"
+java ${JAVA_OPTS} -jar ${jarName}.jar --spring.profiles.active=${env} --service=${service} --datafile=${datafile} &
+
+PID=$!
+echo "Waiting for the process ${PID} to be completed..."
+wait $PID
+
+statusCode=${?}
+echo "Data load process is completed with status : ${statusCode}"
+exit ${statusCode}
