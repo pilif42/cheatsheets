@@ -1,0 +1,290 @@
+In a multi-module project, you should only have ONE Gradle Wrapper at the root of
+the project: gradlew, gradlew.bat, gradle\wrapper\gradle-wrapper.jar,
+gradle\wrapper\gradle-wrapper.properties.
+
+
+To list tasks:
+- For all modules: ./gradlew tasks –all
+- For the qa module: ./gradlew :qa:tasks
+
+
+To build a dependency tree:
+- For the loader module: ./ gradlew :loader:dependencies
+- For the qa module: ./gradlew :qa:dependencies
+
+
+Example setup below with the 3 .gradle files (project root, loader module and qa module):
+
+In gradle.properties (at the project root):
+gradleDistVersion=4.10.3
+springBootVersion=2.1.11.RELEASE
+springCloudVersion=Greenwich.SR4
+cucumberVersion=4.3.1
+
+In settings.gradle (at the project root):
+rootProject.name = 'api-loader'
+include 'qa'
+include 'loader'
+project(":loader").name = projArtifactId
+
+In build.gradle (at the project root so common to all modules):
+buildscript {
+    repositories {
+        mavenLocal()
+        maven { url nexusPublicRepoURL }
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath("com.netflix.nebula:gradle-lint-plugin:8.3.1")
+        classpath("com.netflix.nebula:gradle-info-plugin:3.6.0")
+    }
+}
+
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply from: 'sonarqube.gradle'
+
+task wrapper(type: Wrapper) {
+    gradleVersion = "${gradleDistVersion}"
+    distributionUrl = "${gradleDistributionHost}/content/groups/public/org/gradle/gradle/${gradleVersion}/gradle-${gradleVersion}-all.zip"
+}
+
+allprojects {
+    group "${projGroupId}"
+    version "${projVersion}"
+
+    project(":qa") {
+        sonarqube {
+            skipProject = true
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'maven'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    repositories {
+        mavenLocal()
+        maven { url nexusPublicRepoURL }
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        }
+    }
+
+    dependencies {
+        compile ('com.fasterxml.jackson.core:jackson-databind:2.10.2') {
+            force = true
+        }
+        compile ('com.fasterxml.jackson.core:jackson-core:2.10.2') {
+            force = true
+        }
+        compile ('com.thoughtworks.xstream:xstream:1.4.11.1') {
+            force = true
+        }
+        compile ('org.apache.tomcat.embed:tomcat-embed-core:9.0.30') {
+            force = true
+        }
+
+        compile ('org.springframework.cloud:spring-cloud-starter-netflix-eureka-client') {
+            exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
+            exclude group: 'com.thoughtworks.xstream', module: 'xstream'
+        }
+    }
+}
+
+In loader/build.gradle:
+import org.apache.tools.ant.filters.ReplaceTokens
+
+jar {
+    baseName = "${projArtifactId}"
+    version = "${projVersion}"
+    exclude('*.yml')
+}
+
+artifacts {
+    archives file("${buildDir}/distributions/${project.name}-${project.version}.tar")
+}
+
+task tar(type: Tar, dependsOn: bootJar) {
+    into("${project.name}-${project.version}")
+
+    from("${buildDir}/libs/${project.name}-${project.version}.jar") {
+        fileMode 0770
+    }
+    from(sourceSets.main.resources) {
+        include('*')
+        fileMode 0770
+    }
+    from(sourceSets.main.resources) {
+        include('*.sh')
+        filter(ReplaceTokens, tokens: [
+                'project.name'   : project.name,
+                'project.version': project.version.toString()
+        ])
+        fileMode 0775
+    }
+    from("input") {
+        into('input')
+    }
+    from('ext-config') {
+        into('ext-config')
+        fileMode 0770
+    }
+}
+
+build.dependsOn(tar)
+
+dependencies {
+    compile 'org.springframework.boot:spring-boot-starter'
+    compile 'org.springframework:spring-web'
+    compile 'org.json:json:20180813'
+    ....
+
+    testCompile 'pl.pragmatists:JUnitParams:1.1.1'
+    testCompile 'com.google.guava:guava:18.0'
+    testCompile 'org.springframework.boot:spring-boot-starter-test'
+    testCompile 'uk.org.lidalia:slf4j-test:1.2.0'
+}
+
+compileJava.dependsOn(processResources)
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: nexusReleaseRepoURL) {
+                authentication(userName: nexusUsername, password: nexusPassword)
+            }
+            snapshotRepository(url: nexusSnapshotRepoURL) {
+                authentication(userName: nexusUsername, password: nexusPassword)
+            }
+        }
+    }
+}
+
+In qa/build.gradle:
+
+import groovyx.gpars.GParsPool
+import net.masterthought.cucumber.Configuration
+import net.masterthought.cucumber.ReportBuilder
+
+buildscript {
+    repositories {
+        mavenLocal()
+        maven { url nexusPublicRepoURL }
+    }
+    dependencies {
+        classpath("org.codehaus.gpars:gpars:1.2.1")
+        classpath("net.masterthought:cucumber-reporting:3.5.1")
+    }
+}
+
+group = 'com.sample.qa'
+description = 'QA Automation Framework for our Loader'
+
+configurations {
+    all*.exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
+}
+
+dependencies {
+    compile 'org.springframework.boot:spring-boot-starter-test'
+    compile ('org.springframework.boot:spring-boot-starter-web') {
+        exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
+        exclude group: 'org.apache.tomcat.embed', module: 'tomcat-embed-core'
+    }
+    compile 'org.springframework.retry:spring-retry'
+    compile ('org.springframework.data:spring-data-gemfire') {
+        exclude group: 'com.fasterxml.jackson.core', module: 'jackson-databind'
+    }
+    compile "org.apache.lucene:lucene-queryparser:7.3.1"
+
+    compile "io.cucumber:cucumber-java:${cucumberVersion}"
+    compile "io.cucumber:cucumber-junit:${cucumberVersion}"
+    compile "io.cucumber:cucumber-jvm:${cucumberVersion}"
+    compile "io.cucumber:cucumber-spring:${cucumberVersion}"
+
+    ...
+
+    testCompile "junit:junit:4.11"
+}
+
+task cucumber(type: JavaExec) {
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'org.junit.runner.JUnitCore'
+    args = ['com.sample.qa.LoaderTestRunner']
+
+    systemProperty "cucumber.options", System.properties.getProperty("cucumber.options")
+    systemProperties System.getProperties()
+
+    systemProperty "cucumber.options", System.properties.getProperty("cucumber.options")
+    systemProperty "spring.profiles.active", System.properties.getProperty("spring.profiles.active")
+    systemProperty "jarName", project(':api-loader').jar.archivePath
+    systemProperties['user.dir'] = workingDir
+    println "loader ::" + project(':api-loader').jar.archivePath
+}
+
+task cucumberParallel {
+    doLast {
+        def testProperties = "-Dspring.profiles.active=" + System.properties.getProperty("spring.profiles.active") + " -DjarName=" + project(':api-loader').jar.archivePath
+        runCucumberTests(testProperties, System.properties.getProperty("cucumber.options"))
+        generateCucumberReports()
+    }
+}
+
+def runCucumberTests(testProperties, cucumberOptions) {
+    def features = fileTree(dir: "${project.projectDir}/src/test/resources/features/").include '**/*.feature'
+
+    GParsPool.withPool(12) {
+        features.eachParallel { File file ->
+            exec {
+                executable "sh"
+                args "-c", "mkdir -p ${project.projectDir}/target" +
+                        "&& java ${testProperties} " +
+                        "-cp ${sourceSets.main.runtimeClasspath.asPath} " +
+                        "cucumber.api.cli.Main " +
+                        "--glue com.sample.qa " +
+                        "${file.absolutePath.substring(file.absolutePath.indexOf("src/test"))} " +
+                        "--plugin json:${project.projectDir}/target/${file.name}.json " +
+                        "--plugin junit:${project.projectDir}/target/${file.name}.xml " +
+                        "--plugin pretty > ${project.projectDir}/target/${file.name}.log " +
+                        "${cucumberOptions}"
+            }
+            println("${file.name}: Scenario output: ${project.projectDir}/target/${file.name}.log ")
+        }
+    }
+}
+
+def generateCucumberReports() {
+    def jsonReports = fileTree(dir: "${project.projectDir}/target/").include '**/*.json'.toString()
+    File reportOutputDirectory = new File("${project.projectDir}/target");
+
+    List<String> jsonReportFiles = new ArrayList<String>();
+    jsonReports.each { File file ->
+        jsonReportFiles.add("${file.absolutePath}".toString());
+    }
+
+    Configuration configuration = new Configuration(reportOutputDirectory, "api-loader-qa");
+    ReportBuilder reportBuilder = new ReportBuilder(jsonReportFiles, configuration);
+    reportBuilder.generateReports();
+}
+
+tasks.withType(JavaExec) {
+    jvmArgs = ['-XX:NewSize=512m', '-XX:NewSize=1024m']
+}
+
+cucumber.dependsOn project(':api-loader').tasks.bootJar
+cucumberParallel.dependsOn project(':api-loader').tasks.bootJar
+cucumberParallel.dependsOn build
+
+bootJar {
+    enabled = false
+}
