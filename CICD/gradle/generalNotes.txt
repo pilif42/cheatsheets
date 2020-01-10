@@ -32,6 +32,13 @@ def withoutLog4j = {
 compile "org.springframework.boot:spring-boot-starter-web", withoutLog4j
 
 
+- To exclude a module from all dependencies:
+Before the dependencies section, add:
+configurations {
+    all*.exclude group: 'org.apache.logging.log4j', module: 'log4j-to-slf4j'
+}
+
+
 - To use a class belonging to project_A in src/test in a project_B:
 		- AvroContextUtil is in src/test of module common-storm-ingest
 		- We want to use it in module ods-storm-event-ingest (in src/test).
