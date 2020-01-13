@@ -50,3 +50,98 @@ And in ApiLoaderAutomationStepDefinitions, define:
 public void loaderIsBeingStarted() throws CustomException, IOException {
     stepImplementation.validateApiLoad();
 }
+
+
+********************************************************************************
+
+
+Waiting for an event: rather than a Thread.sleep() with a static number of milliseconds,
+use compile "org.awaitility:awaitility:4.0.1" as waiting times can significantly
+vary depending on where you run the code (locally, on jenkins, etc.).
+
+boolean checkEntityHasBeenCreated(final EntityParams entityParams) throws JsonProcessingException {
+    final String entityCode = entityParams.getCode();
+    final boolean result = fetchEntityResourceId(entityParams);
+    if (result) {
+        LOGGER.info("Entity Resource Details successfully fetched for entityCode {}", entityCode);
+        scenario.write(format("Entity Resource Details successfully fetched for entityCode %s \n", entityCode));
+    }
+    return result;
+}
+
+with
+
+private void verifyTheLoaderHasFinishedProcessing(final EntityParams entityParams) {
+    LOGGER.info("Starting to wait: ");
+    await().atMost(ofMinutes(5))
+            .with()
+            .pollInterval(ofSeconds(30))
+            .until(() -> checkEntityHasBeenCreated(entityParams));
+    LOGGER.info("Finished waiting.");
+}
+
+where
+
+import static java.time.Duration.ofSeconds;
+import static java.time.Duration.ofMinutes;
+
+
+********************************************************************************
+
+
+Cuke test with DataTable:
+
+Feature file:
+
+Then the entity is available in the database
+  | entityCode  | entityDescription         | entityIndustryCode  | entityIndustryDescription |
+  | 1111        | QA Test Eden              | 11                  | QA Test Industry Eden     |
+
+
+Glue code (in package com.sample.qa.steps : see that it is important below with DataTableConfigurer) :
+
+@Then("^the entity is available in the database$")
+public void entityShouldGetCreated(final DataTable dataTable) throws JsonProcessingException {
+    final List<EntityParams> entityParamsList = dataTable.asList(EntityParams.class);
+    stepImplementation.checkEntityHasBeenCreated(entityParamsList.get(0));
+}
+
+Where
+
+public class EntityParams {
+      private String entityCode;
+      private String entityDescription;
+      private String entityIndustryCode;
+      private String entityIndustryDescription;
+
+
+And you also need the class below in the right package (it will be picked up automatically):
+package com.sample.qa.steps;
+
+import com.sample.qa.domain.EntityParams;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import cucumber.api.TypeRegistry;
+import cucumber.api.TypeRegistryConfigurer;
+import io.cucumber.datatable.DataTableType;
+
+import java.util.Locale;
+import java.util.Map;
+
+import static java.util.Locale.ENGLISH;
+
+public class DataTableConfigurer implements TypeRegistryConfigurer {
+      @Override
+      public Locale locale() {
+        return ENGLISH;
+      }
+
+      @Override
+      public void configureTypeRegistry(TypeRegistry typeRegistry) {
+        ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+        typeRegistry.defineDataTableType(new DataTableType(
+            EntityParams.class,
+            (Map<String, String> row) -> objectMapper.convertValue(row, EntityParams.class))
+        );
+      }
+}
