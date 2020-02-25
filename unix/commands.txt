@@ -69,6 +69,22 @@
      	- cp -R /var/www/html/inspire/2_1_0_3 /var/www/html/inspire/philversion
 
 
+- to transfer files from a unix server (hidden123.sample.com) to my local machine:
+			- ssh into jumpbox.sample.com (with WinCrt) -> required as hidden123 can't be accessed directly
+			- ssh into hidden123.sample.com
+			- dzdo su - superuser
+			- cp /opt/app/data/inbound/sample/myfile.txt /tmp
+			- cd /tmp
+			- chmod 777 myfile.txt
+			- exit
+			- cp /tmp/myfile.txt /home/pbrossi
+			- exit -> we are now back on jumpbox
+			- cd /home/pbrossi
+			- scp pbrossi@hidden123.sample.com:/home/pbrossi/myfile.txt /home/pbrossi/myfile.txt
+			- chmod 777 myfile.txt
+			- WinScp to jumpbox.sample.com from my laptop to grab the file myfile.txt.
+
+
 - when having issues after having copied a file from windows:
 		- dos2unix filename
 
