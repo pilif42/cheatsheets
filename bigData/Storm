@@ -1,27 +1,26 @@
-Amount of data processed each day in PROD:
+- Amount of data processed each day in PROD:
       - 30 million events
       - 175 million indexes
-      - Both are currently loaded onto Kafka topics via batch
-      processes (ie Spring Boot apps reading files).
+      - Both are currently loaded onto Kafka topics via batch processes (ie Spring Boot apps reading files).
 
 
-Kafka setup in PROD: 3 Kafka brokers and only 1 partition per topic. This limit of 1 has been spotted by the Hortonworks consultants as a bad bottleneck. It should be increased but be aware that:
+- Kafka setup in PROD: 3 Kafka brokers and only 1 partition per topic. This limit of 1 has been spotted by the Hortonworks consultants as a bad bottleneck. It should be increased but be aware that:
       - More partitions mean more files opened -> more memory requirement.
       - More parallelism means more processing -> more memory requirement.
 
 
-To verify the performance of a Storm topology, open the Storm UI and check in the following order:
+- To verify the performance of a Storm topology, open the Storm UI and check in the following order:
       - Kafka Spouts lag.
       - Processing times at each bolt.
       - Capacity of each bolt. The maximum figure is 1. The recommended figure by Hortonworks is 0.85.
 
 
-To improve the performance of a Storm topology, do the following one step at a time. After each step, you need to restart your topology and verify the capacity of each bolt (is it closer to .85?):
+- To improve the performance of a Storm topology, do the following one step at a time. After each step, you need to restart your topology and verify the capacity of each bolt (is it closer to .85?):
       - Add more partitions to the Kafka topic our Storm app reads from.
       - Increase topology.max.spout.pending. The default value is 1000 and it means that the Kafka spout reads 1000 messages at a time.
 
 
-To install and start topologies:
+- To install and start topologies:
       - ssh into the Edge node and cd /home/app/
       - wget -O install.tar "https://nexus.sample.com:8443/service/local/artifact/maven/redirect?r=snapshots&g=com.sample&a=storm-ingest&v=1.0.857-SNAPSHOT&p=tar"
       - tar -xvf install.tar
@@ -77,3 +76,22 @@ To install and start topologies:
 
 - Location of properties files relied upon by libraries added as compile dependencies:
     - When I explode my-storm-app-1.0.0-SNAPSHOT-repackaged.jar, these props files (kafka.producer.default.properties, event-config.yml, etc.) are directly at the root.
+
+
+- Example of a Topology:
+    - define in a topology class:
+          - spout
+          - decoder bolt
+          - filter bolt
+          - hbase bolt
+          - serializerBolt
+          - kafkaBolt to publish to Kafka
+
+
+- General info:
+    - to attach bolts together: shuffleGrouping
+    - important methods in a bolt: prepare, execute, emit, declareOutputFields
+        - order in which they are called: https://stackoverflow.com/questions/28981197/execution-flow-of-a-storm-program
+    - to pass through a tuple:
+        - when you emit from one bolt: use the input tuple as an anchor
+        - do not forget to ack the tuple at the end of the processing: done with this.outputCollector.ack(tuple); at the end of a bolt's execute method.
