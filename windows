@@ -1,0 +1,13 @@
+To modify your JAVA_HOME when not an Administrator:
+
+To display your current JAVA_HOME:
+echo $JAVA_HOME
+
+To change it to jdk1.8.0_221 for a given GitBash session:
+export JAVA_HOME='C:\Program Files\Java\jdk1.8.0_221'
+export PATH=$JAVA_HOME/bin:$PATH
+
+To change it globally:
+In the loupe icon (next to Start), type Control Panel.
+In the Control Panel, select User Accounts.
+In the User Accounts, select “Change my environment variables”.
