@@ -11,3 +11,4 @@ curl -d "@data.json" -X POST http://localhost:3000/data
 
 - PATCH examples:
 http://jsonpatch.com/
+In terms of headers, it is essential to have Content-Type = application/json-patch+json

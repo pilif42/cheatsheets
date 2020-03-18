@@ -1,6 +1,7 @@
 - in vi:
 	- go to the beginning of line 13: :13
 	- go to column 270 of the current line: 270|
+	- replace all 2018-01-08 dates with 2020-03-08 in a file: :%s/2018-01-08/2020-03-08/g
 
 
 - list contents of a .jar: jar tf my.jar
