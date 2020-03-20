@@ -37,11 +37,15 @@
             - vi configArgs.yaml
       - Verify all running topos: storm list
       - Kill running topos if required:
-            - cd /home/app/
-            - sh topology_cleanup.sh <Topo_ID> <Topo_Name>
-            - or:
-                  - storm kill event_topology
-                  - storm kill index_topology
+            - recommended way:
+                - identify worker nodes (In devint, we only had 1 worker node per topology.)
+                - ssh into each worker node
+                - cd /home/app/
+                - sh topology_cleanup.sh <Topo_ID> <Topo_Name> (Note that the content of topology_cleanup.sh is further below. Topo_ID & Topo_Name can be found in the Storm UI.)
+            - or shortcut:
+                - use 'storm kill' at the Edge node but not recommended as it has a tendency to leave behind running processes in worker nodes:
+                - storm kill event_topology
+                - storm kill index_topology
       - Start the event topo:
             - cd storm-event-ingest-1.0.857-SNAPSHOT
             - ./start.sh
@@ -95,3 +99,72 @@
     - to pass through a tuple:
         - when you emit from one bolt: use the input tuple as an anchor
         - do not forget to ack the tuple at the end of the processing: done with this.outputCollector.ack(tuple); at the end of a bolt's execute method.
+
+
+- topology_cleanup.sh (script to kill topologies):
+
+#!/usr/bin/sh
+#################################################################################
+# SCRIPT_NAME: topology_cleanup.sh
+#################################################################################
+
+validateArguments() {
+    echo "Topology ID is $1"
+    TOPOLOGY_ID=$1
+    if [ ${#TOPOLOGY_ID} -le 14 ]
+        then
+    ## The Topology id is uniquely identified by 14 additional characters after the topology name, if id is less than 14
+    ## the script will reconfirm with the user.
+        echo "The topology id seems to be incorrect"
+        echo "Wrong id can kill processes you dont want to kill and cause unexpected system behaviour"
+        echo "To exit the script type 'No' and press enter/return"
+        echo "To continue type 'Yes'(case sensitive) and press enter/return"
+        read ANSWER
+        if [ -z "$ANSWER" ]
+        then
+          exit 1;
+        fi
+          if [ $ANSWER != "Yes" ]
+          then
+            echo "exiting the script"
+            exit 1
+          fi
+        fi
+}
+
+topologyCleanup() {
+    TOPOLOGY_ID=$1
+    TOPOLOGY_NAME=$2
+    storm kill ${TOPOLOGY_NAME} -w 20
+    STORM_PROCESSES=$(ps -ef | grep ${TOPOLOGY_ID} | grep -v 'grep' | awk '{ printf " " $2 }')
+    if [ -z "${STORM_PROCESSES}" ]
+    then
+      echo "No process found to be killed for topology"
+    else
+      echo "Processes to be killed for the topology are:"
+      echo ${STORM_PROCESSES}
+      echo "Killing these processes....."
+      kill -9 ${STORM_PROCESSES}
+    fi
+}
+
+main() {
+TOPOLOGY_ID=$1
+TOPOLOGY_NAME=$2
+validateArguments ${TOPOLOGY_ID}
+topologyCleanup ${TOPOLOGY_ID} ${TOPOLOGY_NAME}
+}
+
+#############################################
+#Execution of this shell script starts here
+#############################################
+echo "*** NOTE: This script should be executed inside a Storm Worker Node ***"
+if [ $# -ne 2 ]
+  then
+    echo "Incorrect number of arguments supplied, add topology id and topology name as arguments to this script"
+    echo "Usage: sh topology_cleanup.sh <topology_id> <topology_name>"
+    echo "Example: sh topology_cleanup.sh events_topology_155-11-1550252858 events_topology_155"
+    exit 1
+fi
+
+main $1 $2
