@@ -145,3 +145,32 @@ public class DataTableConfigurer implements TypeRegistryConfigurer {
         );
       }
 }
+
+
+********************************************************************************
+
+
+IntelliJ Run Config:
+
+Create a JUnit Run Config with:
+    - name = QARunner
+    - Class = com.sample.runner.TestRunner (which is under the qa_main module)
+    - VM options = -ea -Dcucumber.options="--tags @TESTPB" -DuseProxy=true -Djavax.net.ssl.trustStore=src/test/resources/cacerts -Dspring.profiles.active=devint5 -Deureka.username=devintuser -Deureka.password=development
+    - Use classpath pf module = qa_main
+    - Shorten cmd line = JAR manifest
+
+where
+
+package com.sample.qa.automation.runner;
+
+import io.cucumber.junit.Cucumber;
+import io.cucumber.junit.CucumberOptions;
+import org.junit.runner.RunWith;
+
+@RunWith(Cucumber.class)
+@CucumberOptions(features = {"src/test/resources/features/parallelRun"},
+        glue = {"com.sample.qa.automation.steps"},
+        plugin = {"html:target/cucumber-html-report", "json:target/cucumber.json",
+                "pretty:target/cucumber-pretty.txt", "junit:target/cucumber-results.xml"})
+public class TestRunner {
+}
