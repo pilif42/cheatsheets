@@ -11,6 +11,10 @@
 	- now delete the old version
 
 
+- To switch to Darcula mode:
+	- View --> Quick Switch Scheme --> Look and Feel
+	
+
 - font size (sur Mac, acces a ces menus avec ToucheMac + ,):
 	- Settings > Appearance & Behaviour > Appearance > tick Override default fonts and bump up to 17
 	- Scroll with the mouse: Settings > Editor > General > tick box mentioning mouse wheel
