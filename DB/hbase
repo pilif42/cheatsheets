@@ -1,3 +1,14 @@
+- HBase maintains two cache structures:
+    - Memory store:
+        - implemented as the MemStore, accumulates data edits as they’re received, buffering them in memory.
+    - Block cache:
+        - an implementation of the BlockCache interface, keeps data blocks resident in memory after they’re read.
+
+
+- http://www.larsgeorge.com/2010/01/hbase-architecture-101-write-ahead-log.html
+
+
+
 - To get a hbase shell:
 ssh myserver.com
 dzdo su - specific_username
@@ -15,4 +26,19 @@ klist -> to verify all is OK
 
 - Sample commands (after a hbase shell):
     - to list all tables: list
+    - to create a table with a column family e: create 'events', 'e'
+    - to alter a table by adding a column family x: alter 'events', 'x'
     - to verify that the table events exists: exists 'events'
+    - to describe the table events: describe 'events'
+    - to get the nb of rows in the table events: count 'events'
+    - to list data in the table events:
+          - no filter: scan 'events'
+          - with a filter:
+              - column 'e' only: scan 'events', {COLUMNS => ['e']}
+              - column 'e' only and 3 rows max: scan 'events', {COLUMNS => ['e'], LIMIT => 3}
+              - within a timerange: scan 'events', {TIMERANGE => [1558429909800, 1558429909899]}
+              - to find out indexes with eventRowKey = 13q3c9nl03p0f3o097j1vqvwssu8in9qlbb2lqu07pla0
+                    scan 'indexes', { FILTER => "ValueFilter(=, 'substring:13q3c9nl03p0f3o097j1vqvwssu8in9qlbb2lqu07pla0')"}
+              - to clear a table:
+                    truncate_preserve 'events' -> drops data within a table but maintains the metadata about the table contained in hbase:meta. So, permissions, etc are not lost.
+                    truncate 'events'

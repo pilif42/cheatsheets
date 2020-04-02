@@ -1,0 +1,17 @@
+- Execute queries in a UI:
+    - log into the GemFire Pulse UI
+    - click on the 'Data Browser' tab to get the query editor
+
+
+- Execute queries in a Shell:
+    - ssh into myhost.myorg.com
+    - dzdo /bin/su - gemfire
+    - gfsh
+    - connect --locator=myhost.myorg.com[10334]? --security-properties-file=/opt/app/data/gemfire/security/gfsecurity.properties
+
+
+- Sample queries:
+    - To view all entities: select * from /region_name
+    - To view a specific entity: select * from /region_name where resourceId = 'b885a97d-1af9-4e29-979d-f54650f76369'
+    - To delete a specific entity: remove --region=/region_name --key='97b9d612-819a-4578-8419-02a1aa2086ec'
+    - To delete all entities: remove --region=/region_name --all=true
