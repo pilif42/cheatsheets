@@ -283,3 +283,13 @@ public StreamingResponseBody getAllPartyHierarchies(@RequestParam(name = "extern
 Where the interface HierarchyService contains:
 void expandAllRootNodes(OutputStream out, final Date effectiveDate) throws IOException;
 void getAllPartyHierarchies(OutputStream out) throws IOException;
+
+
+- To start a 2.0 Spring Boot app:
+    - In GitBash:
+          - build the .jar with mvn clean install
+          - cd target
+          - java -Dspring.profiles.active="local" -jar monetisation-service-0.0.1-SNAPSHOT.jar
+    - In IntelliJ:
+          - Run config with VM options: -Dspring.profiles.active="local"
+          - or Maven window with 'm' icon: mvn clean spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=local"
