@@ -293,3 +293,169 @@ void getAllPartyHierarchies(OutputStream out) throws IOException;
     - In IntelliJ:
           - Run config with VM options: -Dspring.profiles.active="local"
           - or Maven window with 'm' icon: mvn clean spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=local"
+
+
+- To store an entity data across 2 tables: the entity is ErrorOmission. The tables are error_omission, error_omission_products (note the @ElementCollection on the Set<Product> products) and error_omission_access_types (note the @ElementCollection on the Set<AccessType>).
+    - Schema defined in db.changelog-master.yaml through Liquibase:
+          databaseChangeLog:
+            - changeSet:
+                id: 1
+                author: pbross
+                changes:
+                  - createTable:
+                      tableName: error_omission
+                      columns:
+                        - column:
+                            name: error_reference
+                            type: BIGINT
+                            autoIncrement: true
+                            constraints:
+                              - primaryKey: true
+                                nullable: false
+                        - column:
+                            name: developer_id
+                            type: varchar(255)
+                            constraints:
+                              - nullable: false
+                        - column:
+                            name: correction_type
+                            type: varchar(20)
+                            constraints:
+                              - nullable: false
+                        - column:
+                            name: other_product
+                            type: varchar(255)
+                            constraints:
+                              - nullable: true
+                        - column:
+                            name: other_access_type
+                            type: varchar(255)
+                            constraints:
+                              - nullable: true
+                        - column:
+                            name: title
+                            type: varchar(255)
+                        - column:
+                            name: description
+                            type: CLOB
+                        - column:
+                            name: impact
+                            type: varchar(255)
+                        - column:
+                            name: geom
+                            type: Geometry
+                            constraints:
+                              - nullable: true
+                        - column:
+                            name: location
+                            type: Geometry
+                            constraints:
+                              - nullable: true
+                        - column:
+                            name: created
+                            type: DATETIME
+                            constraints:
+                              - nullable: false
+
+                  - createTable:
+                      tableName: error_omission_products
+                      columns:
+                        - column:
+                            name: error_omission_error_reference
+                            type: BIGINT
+                            constraints:
+                              - foreignKeyName: fk_product_error_omission
+                                references: error_omission(error_reference)
+                                nullable: false
+                        - column:
+                            name: product
+                            type: varchar(50)
+                            constraints:
+                              - nullable: false
+
+                  - createTable:
+                      tableName: error_omission_access_types
+                      columns:
+                        - column:
+                            name: error_omission_error_reference
+                            type: BIGINT
+                            constraints:
+                              - foreignKeyName: fk_access_types_error_omission
+                                references: error_omission(error_reference)
+                                nullable: false
+                        - column:
+                            name: access_type
+                            type: varchar(20)
+                            constraints:
+                              - nullable: false
+
+            - changeSet:
+                id: 2
+                author: pbross
+                changes:
+                  - sql:
+                      dbms: mssql
+                      splitStatements: true
+                      sql: |
+                        CREATE SPATIAL INDEX error_omission_geom_idx ON error_omission(geom) WITH ( BOUNDING_BOX = (-100000, 0, 700000, 1300000) );
+                        CREATE SPATIAL INDEX error_omission_location_idx ON error_omission(location) WITH ( BOUNDING_BOX = (-100000, 0, 700000, 1300000) );
+                  - sql:
+                      dbms: h2
+                      splitStatements: true
+                      sql: |
+                        CREATE SPATIAL INDEX error_omission_geom_idx ON error_omission(geom);
+                        CREATE SPATIAL INDEX error_omission_location_idx ON error_omission(location);
+
+    - Entity bean defined with:
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+
+import javax.persistence.*;
+import java.time.Instant;
+import java.util.Set;
+
+@Entity
+@Getter
+@Setter
+@EntityListeners(ErrorOmissionEntityListener.class)
+public class ErrorOmission {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long errorReference;
+
+        private String developerId;
+
+        @Enumerated(EnumType.STRING)
+        private CorrectionType correctionType;
+
+        @ElementCollection
+        @Enumerated(EnumType.STRING)
+        @Column(name = "product")
+        private Set<Product> products;
+
+        private String otherProduct;
+
+        @ElementCollection
+        @Enumerated(EnumType.STRING)
+        @Column(name = "access_type")
+        private Set<AccessType> accessTypes;
+
+        private String otherAccessType;
+
+        @Column(name = "geom")
+        private Geometry geometry;
+
+        private Point location;
+
+        private String title;
+
+        private String description;
+
+        private String impact;
+
+        @CreationTimestamp
+        private Instant created;
+}
