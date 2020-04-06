@@ -1,0 +1,7 @@
+- Why H2?
+It provides a quick-to-setup in-memory store. Very useful when developing a
+Spring Boot app for instance: see https://www.baeldung.com/spring-boot-h2-database
+
+
+- How to enable the H2 console when developing a Spring Boot app?
+https://dzone.com/articles/using-the-h2-database-console-in-spring-boot-with
