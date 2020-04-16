@@ -11,3 +11,16 @@ To change it globally:
 In the loupe icon (next to Start), type Control Panel.
 In the Control Panel, select User Accounts.
 In the User Accounts, select “Change my environment variables”.
+
+
+***
+
+
+To give Admin rights to user johndoe:
+Being logged in as johndoe, launch a command prompt as Administrator.
+Type compmgmt.msc
+In the popup window, expand local users and groups.
+Double-click groups.
+Type johndoe
+Search for it, validate by entering credentials for johndoe.
+Click Apply, OK & Exit.
