@@ -1,0 +1,13 @@
+When Symantec Web Security Service (WSS) is used, you may need to add the required certs to the cacerts for both the Zulu Java and the embedded IntelliJ Java:
+- if you do not add the required certs, you may experience SSLException when running a cmd line build in GitBash for instance.
+- add them to cacerts in C:\Program Files\Zulu\zulu-8\jre\lib\security
+    - Windows Powershell as Administrator
+    - keytool -importcert -file C:\Temp\taf\certificates\CertEmulationCA.crt -keystore "C:\Program Files\Zulu\zulu-8\jre\lib\security\cacerts" -alias "SymantecWSS"
+    - keytool -importcert -file C:\Temp\taf\certificates\entrust_2048_ca.cer -keystore "C:\Program Files\Zulu\zulu-8\jre\lib\security\cacerts" -alias "SymantecWSS1"
+    - pwd is changeit
+
+- add them to cacerts in C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security
+    - Windows Powershell as Administrator
+    - keytool -importcert -file C:\Temp\taf\certificates\CertEmulationCA.crt -keystore "C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security\cacerts" -alias "SymantecWSS"
+    - keytool -importcert -file C:\Temp\taf\certificates\entrust_2048_ca.cer -keystore "C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security\cacerts" -alias "SymantecWSS1"
+    - pwd is changeit
