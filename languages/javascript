@@ -1,0 +1,80 @@
+- To run javascript unit tests in GitBash:
+export NODE_EXTRA_CA_CERTS=/c/Temp/taf/certificates/SymantecWSSCerts.pem
+cd /c/Temp/code/myproj-apigee/proxies
+npm install
+npm test -> this will run all tests.
+npm test IdentifyDataCategory.test.js -> this will run only IdentifyDataCategory.test.js.
+
+
+- To run javascript unit tests in IntelliJ:
+Right-click in your test file.
+In the Run Config which opens, for Jest package, select c:\Temp\code\myproj-apigee\node_modules\jest
+
+
+- Sample .js file called IdentifyDataCategory.js:
+var zoomlevel = context.getVariable("myproj.request.z");
+var srs = context.getVariable("myproj.request.srs");
+
+var payablelayer = 0;
+var datacategory = 'free';
+
+if (zoomlevel !== null && srs !== null) {
+    var zln = Number.parseInt(zoomlevel);
+
+    var payablelayersstr = context.getVariable(properties.payablelayersvar);
+    var PAYABLELAYERS = JSON.parse(payablelayersstr);
+    payablelayer = PAYABLELAYERS[srs];
+
+    if (payablelayer) {
+        datacategory = (zln >= payablelayer) ? 'payable' : 'free';
+    } else {
+        // Reset to the initial value, to pass into the rest of the flow
+        payablelayer = 0;
+    }
+}
+
+context.setVariable('myproj.payablelayer', payablelayer);
+context.setVariable('myproj.request.datacategory', datacategory);
+
+
+Its unit test IdentifyDataCategory.test.js:
+
+/**
+ * @jest-environment node
+ */
+var apigeeEnvironment = require('./apigeeenvironment');
+var scriptUnderTest = "../../../resources/jsc/IdentifyDataCategory.js";
+
+var payablelayersdef = "{ \"27700\": 11, \"3857\": 18 }"
+
+beforeAll(() =>{
+    apigeeEnvironment();
+})
+
+beforeEach(()=>{
+    jest.resetModules().resetAllMocks();
+    request.queryParams = {};
+})
+
+function configureApigeeEnvironment(
+    zoomLevelString,
+    srsString
+) {
+    context.getVariable.mockReturnValueOnce(zoomLevelString)
+        .mockReturnValueOnce(srsString)
+        .mockReturnValueOnce(payablelayersdef);
+}
+
+it('Request for EPSG:27700 Level > 11 returns payable', function() {
+    configureApigeeEnvironment("12", "27700");
+    require(scriptUnderTest);
+    expect(context.setVariable).toHaveBeenCalledWith("myproj.payablelayer", 11);
+    expect(context.setVariable).toHaveBeenCalledWith("myproj.request.datacategory", "payable");
+});
+
+it('Request for EPSG:3857 Level < 18 returns free', function() {
+    configureApigeeEnvironment("17", "3857");
+    require(scriptUnderTest);
+    expect(context.setVariable).toHaveBeenCalledWith("myproj.payablelayer", 18);
+    expect(context.setVariable).toHaveBeenCalledWith("myproj.request.datacategory", "free");
+});
