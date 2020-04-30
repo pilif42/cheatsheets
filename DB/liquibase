@@ -1,0 +1,24 @@
+- To reset Liquibase checksums on an app's SQLServer database:
+
+In the pom.xml, in the plugins section (<project> <build> <plugins>), add:
+      <plugin>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-maven-plugin</artifactId>
+      <version>3.8.6</version>
+      <configuration>
+      <changeLogFile>src/main/resources/db/changelog/db.changelog-master.yaml</changeLogFile>
+      <driver>com.microsoft.sqlserver.jdbc.SQLServerDriver</driver>
+      <url>jdbc:sqlserver://xxx.database.windows.net:1433;database=eando-pb;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;</url>
+      <username>eando</username>
+      <password>yyy</password>
+      </configuration>
+      <executions>
+      <execution>
+      <goals>
+      <goal>clearCheckSums</goal>
+      </goals>
+      </execution>
+      </executions>
+      </plugin>
+
+Then, run mvn liquibase:clearCheckSums
