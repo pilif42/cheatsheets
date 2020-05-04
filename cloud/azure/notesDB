@@ -1,0 +1,9 @@
+- Create an SQLServer database for DEV:
+    - Log into the Azure portal at https://portal.azure.com/#home
+    - Select the Azure service called 'Subscriptions'. If its icon does not appear at the top of the screen, just use the Search box.
+    - Select Enterprise_Dev1
+    - Select 'Resource groups' under Settings:
+          - All these are created by Azure DevOps pipelines.
+          - Select one for E&O = dev1_rg_errorsandomissions
+          - Select dev1-eando
+          - Select 'Create database' and call it eando-pb.

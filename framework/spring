@@ -459,3 +459,9 @@ public class ErrorOmission {
         @CreationTimestamp
         private Instant created;
 }
+
+
+- To create a Swagger spec from the code:
+    - use springdoc-openapi & springdoc-openapi-ui.
+    - for an example, see https://www.baeldung.com/spring-rest-openapi-documentation
+    
