@@ -1,3 +1,13 @@
+- Pb to solve: Our RESTful endpoint returns a Pageable object but in the JSON response, we do not want to see the full default Pageable information (pageNumber, pageSize, etc.).
+Instead, we want to define new fields for the Pageable information.
+The solution is explained at https://www.wimdeblauwe.com/blog/2018/2018-06-10-pageimpl-json-serialization-with-spring-boot-2/.
+In a nutshell:
+      - create a class annotated with @org.springframework.boot.jackson.JsonComponent:
+              - extends com.fasterxml.jackson.databind.JsonSerializer
+              - override public void serialize(Pageable pageable, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException {...
+      - Spring Boot will automatically pick this up (due to the @JsonComponent) to serialize the Pageable objects.
+
+
 - Pb to solve: in the class IINClientRepositoryImpl (which is a @Component), we want to auto-wire a RestTemplate and qualify it with a name (as it
  can only be one of the 2 beans that we configure using @ConditionalOnProperty below – we do NOT want any other RestTemplate and also if they
  were other RestTemplates in the container and we did not qualify ours, then Spring would throw an exception saying it can not decide which bean
@@ -464,4 +474,3 @@ public class ErrorOmission {
 - To create a Swagger spec from the code:
     - use springdoc-openapi & springdoc-openapi-ui.
     - for an example, see https://www.baeldung.com/spring-rest-openapi-documentation
-    
