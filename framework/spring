@@ -1,3 +1,33 @@
+- Pb to solve: Handle a ConstraintViolationException thrown in a Controller.
+
+Create a RestExceptionHandler and inside:
+@ResponseBody
+@ExceptionHandler(ConstraintViolationException.class)
+public ResponseEntity handleConstraintViolationException(ConstraintViolationException exception) {
+    String reason = exception.getMessage();
+    log.error("InvalidRequest - reason is '{}'", reason);
+
+    final StringBuilder exceptionDetails = new StringBuilder();
+    final Set<ConstraintViolation<?>> violationSet = exception.getConstraintViolations();
+    for (Iterator<ConstraintViolation<?>> violationIterator = violationSet.iterator(); violationIterator.hasNext(); ) {
+        final ConstraintViolation<?> violation = violationIterator.next();
+        final Path propertyPath = violation.getPropertyPath();
+        final String propertyName = StreamSupport.stream(propertyPath.spliterator(), false)
+                .map(Path.Node::getName)
+                .reduce((first, second) -> second)
+                .orElseGet(() -> propertyPath.toString());
+        exceptionDetails.append(format("%s %s", propertyName, violation.getMessage()));
+        if (violationIterator.hasNext()) {
+            exceptionDetails.append(",");
+        }
+    }
+
+    ExceptionDto exceptionDto = new ExceptionDto();
+    exceptionDto.setReason(exceptionDetails.toString());
+    return new ResponseEntity<>(exceptionDto, HttpStatus.BAD_REQUEST);
+}
+
+
 - Pb to solve: Our RESTful endpoint returns a Pageable object but in the JSON response, we do not want to see the full default Pageable information (pageNumber, pageSize, etc.).
 Instead, we want to define new fields for the Pageable information.
 The solution is explained at https://www.wimdeblauwe.com/blog/2018/2018-06-10-pageimpl-json-serialization-with-spring-boot-2/.

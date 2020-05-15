@@ -174,3 +174,74 @@ import org.junit.runner.RunWith;
                 "pretty:target/cucumber-pretty.txt", "junit:target/cucumber-results.xml"})
 public class TestRunner {
 }
+
+
+********************************************************************************
+
+
+Rather than using a String in your step definitions, you can use an Enum.
+
+You will need to define the link between the String ‘SampleApp.Create’ given in the feature file and the Enum with the below:
+
+package com.sample.steps;
+
+import io.cucumber.java.ParameterType;
+import com.sample.steps.types.AppRole;
+import com.sample.steps.types.ResponseType;
+
+public class Types {
+    @ParameterType(".*")
+    public AppRole appRole(String roleName) {
+        AppRole role = AppRole.find(roleName);
+        if (role == null) {
+            throw new AssertionError("Role " + roleName + " is not recognised.");
+        }
+        return role;
+    }
+
+    @ParameterType(".*")
+    public ResponseType responseType(String value) {
+        ResponseType rt = ResponseType.valueOf(value.toUpperCase());
+        if (rt == null) {
+            throw new AssertionError("ResponseType " + value + " is not recognised");
+        }
+        return rt;
+    }
+}
+
+
+In the Feature file, you would have:
+Given a user with SampleApp.Create role
+
+
+In the glue code, you would have:
+@Given("a user with {appRole} role(s)")
+public void validOAuthToken(AppRole appRole) {
+    oAuthHelper.setActiveRole(appRole);
+}
+
+Where
+
+@Getter
+public enum AppRole {
+    All("All"),
+    None("None"),
+    SampleApp_Read("SampleApp.Read"),
+    SampleApp_Create("SampleApp.Create"),
+    SampleApp_Update("SampleApp.Update");
+
+    private final String roleName;
+
+    private AppRole(String roleName) {
+        this.roleName = roleName;
+    }
+
+    public static AppRole find(String roleName) {
+        for (AppRole role : AppRole.values()) {
+            if (roleName.toLowerCase().equals(role.getRoleName().toLowerCase())) {
+                return role;
+            }
+        }
+        return null;
+    }
+}

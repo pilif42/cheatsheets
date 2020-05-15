@@ -71,6 +71,9 @@
 				- git remote prune origin
 				- or git fetch –p
 
+		- To delete all local branches that have been merged in remote (except master and anything that has dev in it):
+				- git branch --merged | egrep -v "(^\*|master|dev)" | xargs git branch -D
+
 
 - to switch branch from shop to master:
 			- git checkout master
