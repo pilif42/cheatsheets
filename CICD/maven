@@ -1,37 +1,30 @@
 - repositories:
-	- settings.xml:
-		- default local one at /nfshome/philippe.brossier/.m2
-		- other one (where we say not to go to Maven Central) at /usr/share/maven/conf/
-
 	- my local repo in Centos = /opt/mix/m2/repository
-
-
-- to build without tests: mvn clean install -DskipTests=true
 
 
 - to display the dependency tree: mvn dependency:tree
 
-				
+
 - for a standalone Java project: follow tutorial at http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html
 	- to create the project skeleton:
 			- cd c:\myMaven
 			- mvn archetype:generate -DgroupId=com.mycompany.app -DartifactId=philTestMavenApp -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
-		
+
 	- to build the project:
 			- cd C:\myMaven\philTestMavenApp
 			- mvn package
 			--> this created philTestMavenApp-1.0-SNAPSHOT.jar under C:\myMaven\philTestMavenApp\target
-				
+
 	- to execute the project:
 			- cd C:\myMaven\philTestMavenApp
 			- java -cp target/philTestMavenApp-1.0-SNAPSHOT.jar com.mycompany.app.App
 			--> it prints out: Hello World!
-			
+
 	- to generate documentation:
 			- cd C:\myMaven\philTestMavenApp
 			- mvn site
 			--> this created htnml docs under C:\myMaven\philTestMavenApp\target\site
-				
+
 	- meaning of mvn clean dependency:copy-dependencies package:
 			- 1) clean the project
 			- 2) copy dependencies
@@ -41,7 +34,7 @@
 						- test: test the compiled source code using a suitable unit testing framework. These tests should not require the code be packaged or deployed
 						- package: take the compiled code and package it in its distributable format, such as a JAR.
 
-						
+
 - for an Android project:
 		- set environment variable ANDROID_HOME to the path of your installed Android SDK
 		- add %ANDROID_HOME%\tools and %ANDROID_HOME%\platform-tools to your $PATH
@@ -53,13 +46,13 @@
 									- version asked: I put 1.
 									- platform asked: I put Y for 16
 									--> it created a skeleton under C:\myMaven\philTestAndroidApp
-									
+
 				- to deploy the project to a phone:
 						- plugin phone
 						- cd C:\myMaven\philTestAndroidApp
 						- mvn clean install android:deploy
 						--> note that philTestAndroidApp.apk ends up under C:\myMaven\philTestAndroidApp\target
-						
+
 				- to add Proguard to it:
 						- created proguard.conf under C:\myMaven\philTestAndroidApp with:
 									-injars      target/classes

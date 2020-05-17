@@ -1,0 +1,148 @@
+- Example for a multi-module project (module api & module acceptance-test) pipeline:
+
+- create a directory called pipelines at the project root. Inside it, create 2 directories called jobs and stages.
+Also, have a .yaml file for each environment. The below is sample-api-dev1.yaml
+
+name: $(SourceBranchName)_$(Date:yyyyMMdd)$(Rev:.r)
+
+# Build pipeline for the Sample API. This builds the app, deploys it into test, and runs the acceptance tests.
+# The build is automatically triggered by pushes to dev or master, or you can run the pipeline against any other
+# branch by using the Azure DevOps web interface.
+
+resources:
+  repositories:
+    - repository: sample-app
+      type: git
+      name: poc/sample-app
+      ref: refs/heads/master
+
+trigger:
+  batch: true # Prevent concurrent builds
+  branches:
+    include:
+      - dev
+      - master
+
+# Before this pipeline can be run against a Subscription, it needs to be authorized to access the
+# relevant Service Connection.
+# Whilst a failed authorization will prompt in the UI, this has not proved a reliable means of achieving this.
+# Instead, go to DevOps Project Settings -> Service Connections
+# Select the connection, then the Security menu under the ellipsis and add a Pipeline Permission
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Build_WebApp
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: Maven@3
+            displayName: Build WebApp Package
+            inputs:
+              mavenPomFile: api/pom.xml
+              goals: clean package
+              options: ''
+          - task: PublishCodeCoverageResults@1
+            displayName: Publish WebApp Code Coverage
+            inputs:
+              codeCoverageTool: JaCoCo
+              summaryFileLocation: api/target/site/jacoco/jacoco.xml
+              reportDirectory: api/target/site/jacoco
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: api/target
+              artifactName: webapp
+
+  - template: stages/deployAndTest.yaml
+    parameters:
+      condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+      appEnvironment: dev1
+      mavenProfile: dev
+      skipProvision: $(skipProvision)
+      subscription: "Enterprise Deploy (Dev1 Subscription)"
+
+
+Where stages/deployAndTest.yaml is:
+parameters:
+  deployVmImage: ubuntu-latest
+  subscription: "Enterprise Deploy (Dev1 Subscription)"
+  appEnvironment: dev1
+  mavenProfile: dev
+  deploymentSlot: 'Production'
+  skipProvision: false
+  pipelineReference: current
+  condition: "succeeded()"
+  appInsightsAgentVersion: 2.5.1
+
+stages:
+  - stage: "Deploy_${{ parameters.appEnvironment }}"
+    condition: ${{ parameters.condition }}
+    variables:
+      appService: ${{ parameters.appEnvironment }}sample
+    displayName: "${{ parameters.appEnvironment }}: Deploy Sample API"
+    pool:
+      vmImage: ${{ parameters.deployVmImage }}
+    jobs:
+      - template: pipelines/jobs/deployAppService.yaml@common-app
+        parameters:
+          appService: ${{ variables.appService }}
+          resourceGroup: ${{ parameters.appEnvironment }}_rg_sample
+          devopsEnvironment: Sample_${{ parameters.appEnvironment }}
+          subscription: ${{ parameters.subscription }}
+          artifact: webapp
+          pipelineReference: ${{ parameters.pipelineReference }}
+          deploymentSlot: ${{ parameters.deploymentSlot }}
+          armTemplate: sample-api/azure/appService.json
+          armParameters: sample-api/azure/params/appServiceParams-${{ parameters.appEnvironment }}.json
+          armOverrideParameters: -OAuth2TokenAudience $(appServiceAppId)
+          preDeploymentSteps:
+            - task: AzureCLI@2
+              displayName: "Setup active directory for Sample app"
+              condition: and(succeeded(), ne(variables['skipAzureProvision'], True))
+              inputs:
+                azureSubscription: Enterprise Service Principal Creator
+                scriptType: pscore
+                scriptLocation: scriptPath
+                scriptPath: $(Build.SourcesDirectory)/common-app/scripts/rbac/roleBasedServiceSetup.ps1
+                arguments: -appServiceName ${{ variables.appService }} -roleFileName $(Build.SourcesDirectory)/sample-api/azure/appRoles.json
+
+          serviceStartCommand: java -javaagent:/home/site/wwwroot/applicationinsights-agent-${{ parameters.appInsightsAgentVersion }}.jar -jar /home/site/wwwroot/sample-*.jar
+          serviceRuntime: 'JAVA|8-java8'
+          skipProvision: ${{ eq('parameters.skipProvision', 'True') }}
+
+  - stage: "Test_${{ parameters.appEnvironment }}"
+    dependsOn: "Deploy_${{ parameters.appEnvironment }}"
+    displayName: "${{ parameters.appEnvironment }}: Test Sample"
+    pool:
+      vmImage: ${{ parameters.deployVmImage }}
+    jobs:
+      - template: ../jobs/testSample.yaml
+        parameters:
+          appEnvironment: ${{ parameters.appEnvironment }}
+          mavenProfile: ${{ parameters.mavenProfile }}
+
+
+And jobs/testSample.yaml is
+
+parameters:
+  appEnvironment: dev
+  mavenProfile: dev
+
+jobs:
+  - deployment: "${{ parameters.appEnvironment }}_WebApp_Test"
+    displayName: "${{ parameters.appEnvironment }} WebApp Test"
+    environment: Sample_${{ parameters.appEnvironment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - download: none
+            - checkout: self
+            - task: Maven@3
+              displayName: "Acceptance Tests for ${{ parameters.appEnvironment }}"
+              inputs:
+                mavenPomFile: acceptance-test/pom.xml
+                goals: 'clean test'
+                options: '-P ${{ parameters.mavenProfile }}'
+                testRunTitle: 'Sample API Acceptance Tests - ${{ parameters.mavenProfile }}'
+                mavenAuthenticateFeed: true

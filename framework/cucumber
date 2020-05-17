@@ -156,6 +156,7 @@ Create a JUnit Run Config with:
     - name = QARunner
     - Class = com.sample.runner.TestRunner (which is under the qa_main module)
     - VM options = -ea -Dcucumber.options="--tags @TESTPB" -DuseProxy=true -Djavax.net.ssl.trustStore=src/test/resources/cacerts -Dspring.profiles.active=devint5 -Deureka.username=devintuser -Deureka.password=development
+          - new notation: -ea -Dcucumber.filter.tags="@TESTPB"
     - Use classpath pf module = qa_main
     - Shorten cmd line = JAR manifest
 
