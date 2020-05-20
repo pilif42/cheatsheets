@@ -1,6 +1,7 @@
 - British National Grid = BNG = EPSG:27700
 
 - EPSG:3857 = to follow the GeoJSON spec. It works out of the box with Jackson/JTS.
+      - in the end, we used EPSG:27700 throughout because the GeoJSON spec does allow for use of other systems as a local arrangement.
 
 - good site to convert between systems: https://epsg.io/
       - map using BNG at https://epsg.io/map#srs=27700&x=442098.89&y=114107.67&z=12&layer=streets

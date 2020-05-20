@@ -1,13 +1,40 @@
-When Symantec Web Security Service (WSS) is used, you may need to add the required certs to the cacerts for both the Zulu Java and the embedded IntelliJ Java:
-- if you do not add the required certs, you may experience SSLException when running a cmd line build in GitBash for instance.
-- add them to cacerts in C:\Program Files\Zulu\zulu-8\jre\lib\security
-    - Windows Powershell as Administrator
-    - keytool -importcert -file C:\Temp\taf\certificates\CertEmulationCA.crt -keystore "C:\Program Files\Zulu\zulu-8\jre\lib\security\cacerts" -alias "SymantecWSS"
-    - keytool -importcert -file C:\Temp\taf\certificates\entrust_2048_ca.cer -keystore "C:\Program Files\Zulu\zulu-8\jre\lib\security\cacerts" -alias "SymantecWSS1"
-    - pwd is changeit
+- When Symantec Web Security Service (WSS) is used, you may need to add the required certs to the cacerts for both the Zulu Java and the embedded IntelliJ Java:
+    - if you do not add the required certs, you may experience SSLException when running a cmd line build in GitBash for instance.
+    - add them to cacerts in C:\Program Files\Zulu\zulu-8\jre\lib\security
+        - Windows Powershell as Administrator
+        - keytool -importcert -file C:\Temp\taf\certificates\CertEmulationCA.crt -keystore "C:\Program Files\Zulu\zulu-8\jre\lib\security\cacerts" -alias "SymantecWSS"
+        - keytool -importcert -file C:\Temp\taf\certificates\entrust_2048_ca.cer -keystore "C:\Program Files\Zulu\zulu-8\jre\lib\security\cacerts" -alias "SymantecWSS1"
+        - pwd is changeit
 
-- add them to cacerts in C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security
-    - Windows Powershell as Administrator
-    - keytool -importcert -file C:\Temp\taf\certificates\CertEmulationCA.crt -keystore "C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security\cacerts" -alias "SymantecWSS"
-    - keytool -importcert -file C:\Temp\taf\certificates\entrust_2048_ca.cer -keystore "C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security\cacerts" -alias "SymantecWSS1"
-    - pwd is changeit
+    - add them to cacerts in C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security
+        - Windows Powershell as Administrator
+        - keytool -importcert -file C:\Temp\taf\certificates\CertEmulationCA.crt -keystore "C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security\cacerts" -alias "SymantecWSS"
+        - keytool -importcert -file C:\Temp\taf\certificates\entrust_2048_ca.cer -keystore "C:\Program Files (x86)\JetBrains\IntelliJ IDEA 2019.2.4\jbr\lib\security\cacerts" -alias "SymantecWSS1"
+        - pwd is changeit
+
+
+- Playing with Instants:
+    - public static boolean compareInstants(final Instant instantOne, final Instant instantTwo) {
+          boolean result;
+          if (instantOne != null && instantTwo != null) {
+              Long diff = Duration.between(instantOne, instantTwo).toMillis();
+              LOGGER.debug("instantOne {} and instantTwo {} differ by {} milliseconds.", instantOne, instantTwo, diff);
+              result =  Math.abs(diff) <= BUFFER_MS;
+          } else {
+              result = instantOne == null && instantTwo == null;
+          }
+          return result;
+      }
+    - And test with:
+          private final static DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS");
+
+          @Test
+          public void compareInstants_twoIdenticalInstants() {
+            final String instantOneStr = "2020-05-20T14:55:01.643";
+            final String instantTwoStr = "2020-05-20T14:55:01.643";
+
+            final Instant instantOne = LocalDateTime.parse(instantOneStr, DATE_TIME_FORMATTER).atZone(ZoneId.systemDefault()).toInstant();
+            final Instant instantTwo = LocalDateTime.parse(instantTwoStr, DATE_TIME_FORMATTER).atZone(ZoneId.systemDefault()).toInstant();
+
+            assertTrue(TestUtil.compareInstants(instantOne, instantTwo));
+          }
