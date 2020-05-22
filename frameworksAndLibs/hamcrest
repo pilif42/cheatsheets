@@ -1,0 +1,44 @@
+- Example of extending an Hamcrest Matcher to verify that a String representing an Instant is within so many seconds of a reference Instant:
+
+import java.time.Instant;
+
+public class DateTimeWithinMatcher extends CustomTypeSafeMatcher<String> {
+    private Instant reference;
+    private Duration within;
+    private boolean after;
+
+    public DateTimeWithinMatcher(Instant reference, Duration within, String description) {
+        this(reference, within, description, false);
+    }
+
+    public DateTimeWithinMatcher(Instant reference, Duration within, String description, boolean after) {
+        super(description);
+        this.reference = reference;
+        this.within = within;
+        this.after = after;
+    }
+
+    @Override
+    protected boolean matchesSafely(String dateTime) {
+        Duration gap = Duration.between(reference, Instant.parse(dateTime));
+        if (after && gap.isNegative()) {
+            return false;
+        }
+        return gap.abs().compareTo(within) <= 0;
+    }
+
+    public static Matcher<String> withinDurationOf(Duration duration, Instant of) {
+        String description = "is within " + duration.toString() + " of " + of.toString();
+        return new DateTimeWithinMatcher(of, duration, description);
+    }
+
+    public static Matcher<String> withinSecondsOf(long duration, Instant of) {
+        String description = "is within " + duration + " seconds of " + of.toString();
+        return new DateTimeWithinMatcher(of, Duration.ofSeconds(duration), description);
+    }
+
+    public static Matcher<String> withinSecondsAfter(long duration, Instant of) {
+        String description = "is within " + duration + " seconds after " + of.toString();
+        return new DateTimeWithinMatcher(of, Duration.ofSeconds(duration), description, true);
+    }
+}

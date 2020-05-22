@@ -282,3 +282,116 @@ public class ErrorOmission {
         @CreationTimestamp
         private Instant created;
 }
+
+
+- Example with @Embeddable:
+
+The main Entity is:
+
+package com.sample.errorsandomissions.entity;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+
+import javax.persistence.*;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.Set;
+
+@Entity
+@Getter
+@Setter
+@EntityListeners(ErrorOmissionEntityListener.class)
+public class ErrorOmission {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long errorReference;
+
+    private String developerId;
+
+    @ElementCollection
+    @Enumerated(EnumType.STRING)
+    @Column(name = "product")
+    private Set<Product> products;
+
+    @Column(name = "geom")
+    private Geometry geometry;
+
+    private Point location;
+
+    @ElementCollection
+    private Set<StatusChange> statusHistory;
+
+    @PrePersist
+    public void onCreate() {
+        StatusChange statusChange = new StatusChange();
+        statusChange.setStatus(Status.SUBMITTED);
+        /**
+         * TODO When https://hibernate.atlassian.net/browse/HHH-13829 is fixed, use instead @CreationTimestamp on
+         * TODO changed in StatusChange.
+         */
+        statusChange.setChanged(Instant.now());
+        statusHistory = Collections.singleton(statusChange);
+   }
+}
+
+
+The embedded Entity is:
+package com.sample.errorsandomissions.entity;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import javax.persistence.Embeddable;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import java.time.Instant;
+
+@Embeddable
+@Getter
+@Setter
+public class StatusChange {
+    @Enumerated(EnumType.STRING)
+    private Status status;
+
+    private String resolution;
+
+    private Instant changed;
+}
+
+
+The Liquibase change set is:
+
+- changeSet:
+    id: 7
+    author: jdoe
+    changes:
+      - createTable:
+          tableName: error_omission_status_history
+          columns:
+            - column:
+                name: error_omission_error_reference
+                type: BIGINT
+                constraints:
+                  - foreignKeyName: fk_status_details_error_omission
+                    references: error_omission(error_reference)
+                    nullable: false
+            - column:
+                name: status
+                type: varchar(20)
+                defaultValue: SUBMITTED
+                constraints:
+                  - nullable: false
+            - column:
+                name: resolution
+                type: varchar(255)
+            - column:
+                name: changed
+                type: DATETIME
+                constraints:
+                  - nullable: false
+                  
