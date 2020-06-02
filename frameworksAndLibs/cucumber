@@ -251,6 +251,13 @@ public enum AppRole {
 ********************************************************************************
 
 
+Step with 2 possible values:
+@When("a request to the retrieveErrorOmission endpoint for the ErrorOmission just (created|updated)")
+
+
+********************************************************************************
+
+
 Good example to test a RESTful API:
 
 package com.sample.steps;
