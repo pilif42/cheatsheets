@@ -246,3 +246,415 @@ public enum AppRole {
         return null;
     }
 }
+
+
+********************************************************************************
+
+
+Good example to test a RESTful API:
+
+package com.sample.steps;
+
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
+import com.sample.utils.ApiRequestHelper;
+import com.sample.utils.OAuthHelper;
+
+import static com.sample.utils.ApiRequestHelper.NON_EXISTING_ERROR_REFERENCE;
+import static com.sample.utils.DataUtil.*;
+
+public class UpdateErrorSteps {
+    private final static String UPDATE_PATH = "/errors/{errorReference}/internalstatus";
+
+    private final OAuthHelper oAuthHelper;
+    private final ApiRequestHelper apiRequestHelper;
+
+    public UpdateErrorSteps(ApiRequestHelper apiRequestHelper, OAuthHelper oAuthHelper) {
+        this.apiRequestHelper = apiRequestHelper;
+        this.oAuthHelper = oAuthHelper;
+    }
+
+    @When("a request to the updateError endpoint for a non existing Error")
+    public void a_request_to_the_updateError_endpoint_for_non_existing_Error() {
+        apiRequestHelper.setPathErrorReference(NON_EXISTING_ERROR_REFERENCE);
+        apiRequestHelper.put(UPDATE_PATH, getBasicErrorUpdate());
+    }
+
+    @When("a request to the updateError endpoint with no status")
+    public void a_request_to_the_updateError_endpoint_with_no_status() {
+        apiRequestHelper.setPathErrorReference(NON_EXISTING_ERROR_REFERENCE);
+        apiRequestHelper.put(UPDATE_PATH, getErrorUpdateWithNoStatus());
+    }
+
+    @When("a request to the updateError endpoint with an invalid status")
+    public void a_request_to_the_updateError_endpoint_with_invalid_status() {
+        apiRequestHelper.setPathErrorReference(NON_EXISTING_ERROR_REFERENCE);
+        apiRequestHelper.put(UPDATE_PATH, getErrorUpdateWithInvalidStatus());
+    }
+
+    @When("a request to the updateError endpoint to update the created Error with the minimum required data")
+    public void a_request_to_the_updateError_endpoint_to_update_created_Error_with_minimum_data() {
+        apiRequestHelper.setPathErrorReference(apiRequestHelper.getCreatedError().getErrorReference());
+        apiRequestHelper.put(UPDATE_PATH, getBasicErrorUpdate());
+    }
+
+    @When("a request to the updateError endpoint to update the created Error with the complete data")
+    public void a_request_to_the_updateError_endpoint_to_update_created_Error_with_complete_data() {
+        apiRequestHelper.setPathErrorReference(apiRequestHelper.getCreatedError().getErrorReference());
+        apiRequestHelper.put(UPDATE_PATH, getFullyDefinedErrorUpdate());
+    }
+
+    @Then("the updated response contains no unexpected field and all expected fields")
+    public void updated_response_contains_no_unexpected_fields_and_all_expected_fields(){
+        apiRequestHelper.verifyContainsNoUnexpectedFieldsAndAllExpectedFieldsInPutResponse();
+    }
+
+    @Then("all expected fields in the updated response have the correct values")
+    public void updated_response_contains_expected_fields_with_correct_values(){
+        apiRequestHelper.verifyExpectedFieldsSetWithCorrectValuesInPutResponse();
+    }
+
+    @Then("the updated response for a complete update contains no unexpected field and all expected fields")
+    public void updated_response_complete_update_contains_no_unexpected_fields_and_all_expected_fields(){
+        apiRequestHelper.verifyContainsNoUnexpectedFieldsAndAllExpectedFieldsInPutResponseForCompleteUpdate();
+    }
+
+    @Then("all expected fields in the updated response for a complete update have the correct values")
+    public void updated_response_complete_update_contains_expected_fields_with_correct_values(){
+        apiRequestHelper.verifyExpectedFieldsSetWithCorrectValuesInPutResponseForCompleteUpdate();
+    }
+}
+
+
+And
+
+
+package com.sample.utils;
+
+import io.restassured.filter.log.LogDetail;
+import io.restassured.response.Response;
+import io.restassured.response.ResponseBody;
+import io.restassured.specification.RequestSpecification;
+import org.apache.http.HttpHeaders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.sample.config.AcceptanceTestConfig;
+import com.sample.steps.types.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
+
+import static java.lang.String.format;
+import static io.restassured.RestAssured.given;
+import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
+import static org.hamcrest.Matchers.*;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.*;
+import static com.sample.utils.DataUtil.*;
+import static com.sample.utils.TestUtil.compareInstants;
+import static com.sample.utils.TestUtil.getJSONString;
+
+public class ApiRequestHelper {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiRequestHelper.class);
+
+    public static final Long NON_EXISTING_ERROR_REFERENCE = -1L;
+    private static final String ASSERTION_ERROR_MSG = "Expected object is %s. Actual object is %s.";
+
+    private static Predicate<ReducedError> developerCreatedByTagTestDataCreation = error ->
+            error.getDeveloperId().equals("developer123") && error.getTitle().equals("Tester")
+                    && error.getDescription().equals("Testing purpose");
+
+    private final OAuthHelper oAuthHelper;
+
+    private String baseUrl;
+
+    /**
+     * The Error that is POSTed to the API.
+     */
+    private Error postedError = null;
+    /**
+     * The ErrorUpdateDto that is PUTed to the API.
+     */
+    private ErrorUpdateDto putedErrorUpdateDto = null;
+    /**
+     * The Instant when the PUT was sent.
+     */
+    private Instant instantOfThePut = null;
+    /**
+    * The Error built from the response received from the API.
+     */
+    private Error createdError = null;
+    private Response response = null;
+
+    private RequestSpecification requestSpec;
+
+    public ApiRequestHelper(AcceptanceTestConfig config, OAuthHelper oAuthHelper) {
+        this.baseUrl = config.property(AcceptanceTestConfig.error_URL_PROPERTY);
+        this.oAuthHelper = oAuthHelper;
+        resetRequestSpec();
+    }
+
+    private void resetRequestSpec() {
+        requestSpec = given().log().uri().log().headers();
+    }
+
+    public Error getPostedError() {
+        return postedError;
+    }
+
+    public Error getCreatedError() {
+        return createdError;
+    }
+
+    public void setPageSize(final int pageSize) {
+        requestSpec.queryParam("size", pageSize);
+    }
+
+    public void setPageNumber(final int pageNumber) {
+        requestSpec.queryParam("page", pageNumber);
+    }
+
+    public void setDeveloperId(final String developerId) {
+        requestSpec.queryParam("developerId", developerId);
+    }
+
+    public void setAcknowledged(final boolean acknowledged) {
+        requestSpec.queryParam("acknowledged", acknowledged);
+    }
+
+    public void setBoundingBox(final String bbox) {
+        requestSpec.queryParam("bbox", bbox);
+    }
+
+    public void setPathErrorReference(final Long errorReference) {
+        requestSpec.pathParam("errorReference", errorReference);
+    }
+
+    public void getWithoutToken(final String url) {
+        triggerGet(url);
+    }
+
+    public void get(final String url) {
+        addTokenToRequest();
+        triggerGet(url);
+    }
+
+    private void addTokenToRequest() {
+        String token = oAuthHelper.getToken();
+        if (token != null) {
+            requestSpec.auth().preemptive().oauth2(token);
+        }
+    }
+
+    private void logStatusOnFailure() {
+        response.then().log().ifValidationFails(LogDetail.STATUS);
+    }
+
+    public void post(final String url, final Error Error) {
+        postedError = Error;
+        addTokenToRequest();
+
+        requestSpec.header(HttpHeaders.CONTENT_TYPE, "application/json");
+        requestSpec.body(getJSONString(postedError));
+
+        response = requestSpec
+                .when()
+                .post(baseUrl + url);
+        logStatusOnFailure();
+        // Reset the Request Spec in case there is a follow-up request
+        resetRequestSpec();
+    }
+
+    public void put(final String url, final ErrorUpdateDto errorUpdateDto) {
+        putedErrorUpdateDto = errorUpdateDto;
+        addTokenToRequest();
+
+        requestSpec.header(HttpHeaders.CONTENT_TYPE, "application/json");
+        requestSpec.body(getJSONString(putedErrorUpdateDto));
+
+        instantOfThePut = Instant.now();
+        response = requestSpec
+                .when()
+                .put(baseUrl + url);
+
+        logStatusOnFailure();
+        resetRequestSpec();
+    }
+
+    public void verifyResponseCode(final int expected) {
+        LOGGER.info("Checking response code is {}", expected);
+        response.then()
+                .statusCode(expected);
+    }
+
+    public void verifyPostResponseBodyForErrorOmissionId() {
+        createdError = response.getBody().as(Error.class);
+        assertTrue (createdError.getErrorReference() > 0);
+    }
+
+    public void verifyPostResponseBodyForErrorOmissionDetails() {
+        assertEquals(postedError.getDeveloperId(), createdError.getDeveloperId());
+        assertEquals(postedError.getCorrectionType(), createdError.getCorrectionType());
+        assertEquals(postedError.getOtherProduct(), createdError.getOtherProduct());
+        assertEquals(postedError.getOtherAccessType(), createdError.getOtherAccessType());
+        assertEquals(postedError.getTitle(), createdError.getTitle());
+        assertEquals(postedError.getDescription(), createdError.getDescription());
+        assertEquals(postedError.getImpact(), createdError.getImpact());
+        assertEquals(postedError.getProducts(), createdError.getProducts());
+        assertEquals(postedError.getAccessTypes(), createdError.getAccessTypes());
+        assertEquals(postedError.getLocation(), createdError.getLocation());
+        assertEquals(postedError.getGeometry(), createdError.getGeometry());
+    }
+
+    public void verifyPostResponseBodyForStatusSubmitted() {
+        assertEquals("submitted", createdError.getStatus());
+    }
+
+    public void verifyPostResponseBodyForDates() {
+        final Instant updated = createdError.getUpdated();
+        assertNotNull(updated);
+        assertTrue(compareInstants(updated, createdError.getCreated()));
+    }
+
+    public void verifyGetResponseBody() {
+        final ErrorGetResponse responseObject = response.getBody().as(ErrorGetResponse.class);
+        final List<ReducedError> reducedErrorList = responseObject.getContent();
+        assertEquals(1, reducedErrorList.size());
+
+        final ReducedError reducedError = reducedErrorList.get(0);
+        assertTrue(format(ASSERTION_ERROR_MSG, createdError, reducedError),
+                TestUtil.compare(createdError, reducedError));
+    }
+
+    public void verifyExceptionReason(String reason) {
+        final ExceptionDto exceptionDto = response.getBody().as(ExceptionDto.class);
+        assertEquals(reason, exceptionDto.getReason());
+    }
+
+    public void verifyExceptionReasonContains(String reason) {
+        final ExceptionDto exceptionDto = response.getBody().as(ExceptionDto.class);
+        assertTrue(exceptionDto.getReason().contains(reason));
+    }
+
+    public void verifyJsonDocumentation() {
+        final ResponseBody responseBody = response.getBody();
+        assertNotNull(responseBody.path("openapi"));
+        final Map pathsMap = responseBody.path("paths");
+        assertNotNull(pathsMap.get("/errors"));
+    }
+
+    public void verifyHtmlDocumentation() {
+        final String responseString = response.getBody().print();
+        responseString.contains("data-path=\"/errors\"");
+        responseString.contains("<span class=\"opblock-summary-method\">GET</span>");
+        responseString.contains("<span class=\"opblock-summary-method\">POST</span>");
+        responseString.endsWith("</html>");
+    }
+
+    private void triggerGet(String url) {
+        response = requestSpec
+                .when()
+                .get(baseUrl + url);
+        logStatusOnFailure();
+        resetRequestSpec();
+    }
+
+    public void verifyPageSize(int expectedSize) {
+        response.print();
+        response.then().body("page.size", is(expectedSize));
+    }
+
+    public void verifyPageNumber(int expectedPageNumber) {
+        response.then().body("page.number", is(expectedPageNumber));
+    }
+
+    public void verifyErrorCount(int expectedCount) {
+        response.then().body("content", hasSize(expectedCount));
+    }
+
+    public void verifyContainsErrorsNotFromDeveloper(String developerId) {
+        response.then().body("content.developerId", (hasItem(not(developerId))));
+    }
+
+    public void verifyContainsErrorsOnlyFromDeveloper(String developerId) {
+        response.then().body("content.developerId", everyItem(is(developerId)));
+    }
+
+    public void verifyContainsErrorsNotInState(String state) {
+        response.then().body("content.status", everyItem(not(state)));
+    }
+
+    public void verifyContainsErrorsInState(String state) {
+        response.then().body("content.status", hasItem(state));
+    }
+
+    public void verifyContainsOnlyErrorsInState(String state) {
+        response.then().body("content.status", everyItem(is(state)));
+    }
+
+    public void verifyContainsNoUnexpectedFieldAndAllExpectedFieldsInGetAllResponse() {
+        response.then().assertThat()
+                .body(matchesJsonSchemaInClasspath("jsonSchemas/getAllErrorsWithCompleteData.json"));
+    }
+
+    public void verifyContainsNoUnexpectedFieldsAndAllExpectedFieldsInGetOneResponse() {
+        response.then().assertThat()
+                .body(matchesJsonSchemaInClasspath("jsonSchemas/getOneErrorWithCompleteData.json"));
+    }
+
+    public void verifyContainsAllExpectedFieldsWithCorrectValuesInGetOneResponse() {
+        final Error responseObject = response.getBody().as(Error.class);
+        assertTrue(format(ASSERTION_ERROR_MSG, createdError, responseObject),
+                responseObject.equals(createdError));
+    }
+
+    public void verifyContainsNoUnexpectedFieldsAndAllExpectedFieldsInPutResponse() {
+        response.then().assertThat()
+                .body(matchesJsonSchemaInClasspath("jsonSchemas/updateOneCompleteDataErrorWithMinimalUpdate.json"));
+    }
+
+    public void verifyExpectedFieldsSetWithCorrectValuesInPutResponse() {
+        final Error responseObject = response.getBody().as(Error.class);
+
+        final Error expectedError = createdError;
+        expectedError.setStatus("acknowledged");
+        expectedError.setResolution(null);
+        expectedError.setErrorNote(null);
+
+        expectedError.setUpdated(instantOfThePut);
+
+        final Set<StatusChange> statusHistoryBeforeUpdate = createdError.getStatusHistory();
+        statusHistoryBeforeUpdate.add(StatusChange.builder().status("acknowledged").changed(instantOfThePut).build());
+        expectedError.setStatusHistory(statusHistoryBeforeUpdate);
+
+        assertTrue(format(ASSERTION_ERROR_MSG, expectedError, responseObject),
+                responseObject.looselyEquals(expectedError));
+    }
+
+    public void verifyContainsNoUnexpectedFieldsAndAllExpectedFieldsInPutResponseForCompleteUpdate() {
+        response.then().assertThat()
+                .body(matchesJsonSchemaInClasspath("jsonSchemas/updateOneCompleteDataErrorWithFullUpdate.json"));
+    }
+
+    public void verifyExpectedFieldsSetWithCorrectValuesInPutResponseForCompleteUpdate() {
+        final Error responseObject = response.getBody().as(Error.class);
+
+        final Error expectedError = createdError;
+        expectedError.setStatus("acknowledged");
+        expectedError.setResolution(UPDATED_RESOLUTION);
+        expectedError.setErrorNote(UPDATED_ERROR_NOTE);
+
+        expectedError.setUpdated(instantOfThePut);
+
+        final Set<StatusChange> statusHistoryBeforeUpdate = createdError.getStatusHistory();
+        statusHistoryBeforeUpdate.add(StatusChange.builder().status("acknowledged").resolution(UPDATED_RESOLUTION)
+                .errorNote(UPDATED_ERROR_NOTE).changed(instantOfThePut).build());
+        expectedError.setStatusHistory(statusHistoryBeforeUpdate);
+
+        assertTrue(format(ASSERTION_ERROR_MSG, expectedError, responseObject),
+                responseObject.looselyEquals(expectedError));
+    }
+}
