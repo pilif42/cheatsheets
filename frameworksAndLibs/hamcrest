@@ -42,3 +42,20 @@ public class DateTimeWithinMatcher extends CustomTypeSafeMatcher<String> {
         return new DateTimeWithinMatcher(of, Duration.ofSeconds(duration), description, true);
     }
 }
+
+
+- To verify that a method is called with a given map:
+
+The method:
+public void trackEvent(String name, Map<String, String> properties, Map<String, Double> metrics)
+
+
+The test:
+verify(mockTelemetryClient).trackEvent(eq("ERROR_SUBMITTED"),
+        argThat(allOf(
+                aMapWithSize(2),
+                hasEntry("errorReference", "1"),
+                hasEntry("caseId", "case1")
+        )),
+        isNull());
+        
