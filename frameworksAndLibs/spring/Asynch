@@ -1,0 +1,44 @@
+When decorating a service method with @Async, you will also need to define a configuration as per the below:
+
+@Configuration
+@EnableAsync
+public class AsyncConfig implements AsyncConfigurer {
+
+    private final BfinConfiguration bfinConfiguration;
+
+    public AsyncConfig(BfinConfiguration bfinConfiguration) {
+       this.bfinConfiguration = bfinConfiguration;
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return new CustomAsyncExceptionHandler();
+    }
+
+    @Override
+    public Executor getAsyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        BfinConfiguration.AsynchProperties asynchProperties = bfinConfiguration.getAsynch();
+        executor.setCorePoolSize(asynchProperties.getCorePoolSize());
+        executor.setMaxPoolSize(asynchProperties.getMaxPoolSize());
+        executor.setQueueCapacity(asynchProperties.getQueueCapacity());
+        executor.setThreadNamePrefix("BfinExecutor-");
+        executor.initialize();
+        return executor;
+    }
+}
+
+where
+
+public class CustomAsyncExceptionHandler implements AsyncUncaughtExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(CustomAsyncExceptionHandler.class);
+
+    @Override
+    public void handleUncaughtException(Throwable throwable, Method method, Object... objects) {
+        log.error("All retries to set the caseId for an Error failed. The error message is {}", throwable.getMessage(), throwable);
+        log.debug("Method name - {}", method.getName());
+        for (Object param : objects) {
+            log.debug("Parameter value - {}", param);
+        }
+    }
+}

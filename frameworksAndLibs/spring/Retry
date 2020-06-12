@@ -1,0 +1,65 @@
+- Wrapping calls in a retry:
+
+For instance, in a controller, when calling to the database, you can do:
+final ErrorOmission storedError = dbRetryTemplate.execute(context -> repository.save(error));
+or
+dbRetryTemplate.execute(context -> repository.save(errorOmission));
+
+Where dbRetryTemplate is defined in:
+@Configuration
+@EnableRetry
+public class RetryConfig {
+
+    private final BfinConfiguration bfinConfiguration;
+
+    public RetryConfig(BfinConfiguration bfinConfiguration) {
+        this.bfinConfiguration = bfinConfiguration;
+    }
+
+    @Bean
+    public ExponentialBackOffPolicy exponentialBackOffPolicy() {
+        BfinConfiguration.RetryProperties retryProperties = bfinConfiguration.getRetry();
+
+        ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
+        backOffPolicy.setInitialInterval(retryProperties.getInitialInterval());
+        backOffPolicy.setMaxInterval(retryProperties.getMaxInterval());
+        backOffPolicy.setMultiplier(retryProperties.getMultiplier());
+        return backOffPolicy;
+    }
+
+    @Bean
+    public RetryTemplate apiRetryTemplate(ExponentialBackOffPolicy exponentialBackOffPolicy) {
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        ApiRetryPolicy apiRetryPolicy = new ApiRetryPolicy();
+        BfinConfiguration.RetryProperties retryProperties = bfinConfiguration.getRetry();
+        apiRetryPolicy.setMaxAttempts(retryProperties.getMaxAttempts());
+        retryTemplate.setRetryPolicy(apiRetryPolicy);
+
+        retryTemplate.setBackOffPolicy(exponentialBackOffPolicy);
+
+        retryTemplate.setThrowLastExceptionOnExhausted(true);
+        return retryTemplate;
+    }
+
+    @Bean
+    public FixedBackOffPolicy fixedBackOffPolicy(@Value("${db.retry.backOffPeriod}") long dbRetryBackOffPeriod) {
+        FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
+        backOffPolicy.setBackOffPeriod(dbRetryBackOffPeriod);
+        return backOffPolicy;
+    }
+
+    @Bean
+    public RetryTemplate dbRetryTemplate(FixedBackOffPolicy fixedBackOffPolicy, @Value("${db.retry.maxAttempts}") int maxAttempts) {
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        SimpleRetryPolicy simpleRetryPolicy = new SimpleRetryPolicy();
+        simpleRetryPolicy.setMaxAttempts(maxAttempts);
+        retryTemplate.setRetryPolicy(simpleRetryPolicy);
+
+        retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
+
+        retryTemplate.setThrowLastExceptionOnExhausted(true);
+        return retryTemplate;
+    }
+}

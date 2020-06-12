@@ -394,4 +394,121 @@ The Liquibase change set is:
                 type: DATETIME
                 constraints:
                   - nullable: false
-                  
+
+
+- Spring Integration test for a Repository class:
+See https://reflectoring.io/spring-boot-data-jpa-test/ for a full tutorial. It was used to put together the test below:
+
+package sample.com.repository;
+
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ActiveProfiles;
+import sample.com.LocationCalculator;
+import sample.com.entity.ErrorOmission;
+import sample.com.entity.Product;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static sample.com.util.DataUtil.buildErrorOmission;
+
+@DataJpaTest
+@ActiveProfiles("local,h2")
+public class ErrorOmissionRepositoryTest {
+
+    @Autowired
+    private ErrorOmissionRepository errorOmissionRepository;
+
+    @MockBean
+    private LocationCalculator locationCalculator;
+
+   @MockBean
+    private GeometryFactory geometryFactory;
+
+    @Test
+    void getErrorOmissionsToBeRepaired_emptyDatabase_thenEmptyResultList() {
+        Instant instantEnd = Instant.now();
+        List<ErrorOmission> resultList = errorOmissionRepository.getErrorOmissionsToBeRepaired(instantEnd.minus(7, ChronoUnit.DAYS), instantEnd);
+        assertTrue(resultList.isEmpty());
+    }
+
+    @Test
+    void getErrorOmissionsToBeRepaired_oneErrorLinkedToACaseStored_thenEmptyResultList() {
+       ErrorOmission errorOmission = buildErrorOmission() ;
+        errorOmission.setCaseId("someCaseId");
+        errorOmissionRepository.save(errorOmission);
+
+        Instant instantEnd = Instant.now();
+        List<ErrorOmission> resultList = errorOmissionRepository.getErrorOmissionsToBeRepaired(instantEnd.minus(7, ChronoUnit.DAYS), instantEnd);
+        assertTrue(resultList.isEmpty());
+    }
+}
+
+where application-h2.properties:
+
+
+- To solve org.hibernate.LazyInitializationException at start up:
+When starting our Spring Boot app, we were getting the following exception:
+Caused by: org.hibernate.LazyInitializationException: failed to lazily initialize a collection of role: com.sample.entity.ErrorOmission.products, could not initialize proxy - no Session
+               at org.hibernate.collection.internal.AbstractPersistentCollection.throwLazyInitializationException(AbstractPersistentCollection.java:606)
+               at org.hibernate.collection.internal.AbstractPersistentCollection.withTemporarySessionIfNeeded(AbstractPersistentCollection.java:218)
+               at org.hibernate.collection.internal.AbstractPersistentCollection.readSize(AbstractPersistentCollection.java:162)
+               at org.hibernate.collection.internal.PersistentSet.isEmpty(PersistentSet.java:174)
+               at org.springframework.util.CollectionUtils.isEmpty(CollectionUtils.java:54)
+               at com.sample.util.MappingUtil.map(MappingUtil.java:40)
+               at com.sample.service.BfinServiceImpl.createInternalIssue(BfinServiceImpl.java:43)
+
+Where BfinServiceImpl.createInternalIssue was called in an asynch process:
+@Async
+@Override
+public void startupRepair(long timestamp) {
+    log.debug("Entering startupRepair...");
+    Instant instantEnd = Instant.ofEpochMilli(timestamp);
+    List<ErrorOmission> errorOmissionList = dbRetryTemplate.execute(context ->
+            repository.getErrorOmissionsToBeRepaired(instantEnd.minus(7, ChronoUnit.DAYS), instantEnd));
+    log.debug("Retrieved {} ErrorOmission(s) to be repaired", errorOmissionList.size());
+    errorOmissionList.forEach(error -> errorOmissionService.update(error, bfinService.createInternalIssue(error)));
+}
+
+And this asynch process was triggered in:
+@Component
+public class EventListenerBean {
+    private final BfinConfiguration bfinConfiguration;
+    private final BfinRepairService bfinRepairService;
+
+    public EventListenerBean(BfinConfiguration bfinConfiguration, BfinRepairService bfinRepairService) {
+        this.bfinConfiguration = bfinConfiguration;
+        this.bfinRepairService = bfinRepairService;
+    }
+
+    @EventListener
+    public void onApplicationEvent(ContextRefreshedEvent event) {
+        if (bfinConfiguration.isEnabled()) {
+            bfinRepairService.startupRepair(event.getTimestamp());
+        }
+    }
+}
+
+Note that before createInternalIssue is called, we retrieve from the database the errors to be repaired.
+When we were getting the exception, we were using repository.findAllErrorOmissionWhereCaseIdIsNull.
+
+I fixed it first by adding eager fetching for the collection products on our ErrorAndOmission entity:
+@ElementCollection(fetch = FetchType.EAGER)
+@Enumerated(EnumType.STRING)
+@Column(name = "product")
+private Set<Product> products;
+
+A better solution is to use a query on the repository:
+@Query(value = "select e FROM ErrorOmission e join fetch e.products where e.caseId is null and e.created between :instantStart and :instantEnd")
+List<ErrorOmission> getErrorOmissionsToBeRepaired(Instant instantStart, Instant instantEnd);

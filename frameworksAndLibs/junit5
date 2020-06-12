@@ -1,0 +1,47 @@
+- An example to test a service:
+
+@ExtendWith(MockitoExtension.class)
+public class BfinServiceImplTest {
+
+    private static final String CASE_ID = "CS-123456-L1L2L3";
+    private static final String POST_PATH = "/crm/cases";
+    private static final String ERROR_MSG = "Something went wrong";
+
+    @InjectMocks
+    private BfinServiceImpl bfinService;
+
+    @Mock
+    private BfinConfiguration bfinConfiguration;
+
+    @Mock
+    private RestTemplate bfinRestTemplate;
+
+    private RetryTemplate apiRetryTemplate;
+
+    @BeforeEach
+    public void setup() {
+        when(bfinConfiguration.getPostPath()).thenReturn(POST_PATH);
+
+        apiRetryTemplate = buildApiRetryTemplate();
+        ReflectionTestUtils.setField(bfinService, "apiRetryTemplate", apiRetryTemplate);
+    }
+
+    @Test
+    public void createInternalIssue_happyPath() throws InterruptedException, ExecutionException {
+        // GIVEN
+        final ErrorOmission errorOmission = buildErrorOmissionForBfin();
+        final HttpEntity<ErrorSubmissionDto> request = buildRequest(errorOmission);
+
+        final InternalCaseDto internalCaseDto = new InternalCaseDto();
+        internalCaseDto.setCaseId(CASE_ID);
+        when(bfinRestTemplate.postForObject(POST_PATH, request, InternalCaseDto.class)).thenReturn(internalCaseDto);
+
+        // WHEN
+        CompletableFuture<InternalCaseDto> internalCaseDtoFuture = bfinService.createInternalIssue(errorOmission);
+
+        // THEN
+        assertEquals(internalCaseDto, internalCaseDtoFuture.get());
+
+        verify(bfinConfiguration, times(1)).getPostPath();
+        verify(bfinRestTemplate, times(1)).postForObject(POST_PATH, request, InternalCaseDto.class);
+    }
