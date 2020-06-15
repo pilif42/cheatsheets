@@ -455,7 +455,9 @@ public class ErrorOmissionRepositoryTest {
     }
 }
 
-where application-h2.properties:
+where application-local.properties contains: spring.jpa.show-sql=true
+
+where application-h2.properties contains: spring.jpa.properties.hibernate.dialect=org.hibernate.spatial.dialect.h2geodb.GeoDBDialect
 
 
 - To solve org.hibernate.LazyInitializationException at start up:
@@ -510,5 +512,8 @@ I fixed it first by adding eager fetching for the collection products on our Err
 private Set<Product> products;
 
 A better solution is to use a query on the repository:
-@Query(value = "select e FROM ErrorOmission e join fetch e.products where e.caseId is null and e.created between :instantStart and :instantEnd")
+@Query(value = "select e FROM ErrorOmission e left join fetch e.products where e.caseId is null and e.created between :instantStart and :instantEnd")
 List<ErrorOmission> getErrorOmissionsToBeRepaired(Instant instantStart, Instant instantEnd);
+
+The important thing to note is the ‘left’ before ‘join’. Without it, if an error does not have a product, it will not be
+ returned in the result list.
