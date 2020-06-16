@@ -1,13 +1,15 @@
-When decorating a service method with @Async, you will also need to define a configuration as per the below:
+When decorating a service method with @Async("repairExecutor"), you will also need to define a configuration as per the below:
+      - The important message is that each functionality (here a repair task) MUST have its own thread pool. Otherwise,
+      you risk odd behaviours / deadlocks.
 
 @Configuration
 @EnableAsync
 public class AsyncConfig implements AsyncConfigurer {
 
-    private final BfinConfiguration bfinConfiguration;
+    private final RepairConfiguration repairConfiguration;
 
-    public AsyncConfig(BfinConfiguration bfinConfiguration) {
-       this.bfinConfiguration = bfinConfiguration;
+    public AsyncConfig(RepairConfiguration repairConfiguration) {
+       this.repairConfiguration = repairConfiguration;
     }
 
     @Override
@@ -15,14 +17,14 @@ public class AsyncConfig implements AsyncConfigurer {
         return new CustomAsyncExceptionHandler();
     }
 
-    @Override
-    public Executor getAsyncExecutor() {
+    @Bean
+    public Executor repairExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        BfinConfiguration.AsynchProperties asynchProperties = bfinConfiguration.getAsynch();
+        RepairConfiguration.AsynchProperties asynchProperties = repairConfiguration.getAsynch();
         executor.setCorePoolSize(asynchProperties.getCorePoolSize());
         executor.setMaxPoolSize(asynchProperties.getMaxPoolSize());
         executor.setQueueCapacity(asynchProperties.getQueueCapacity());
-        executor.setThreadNamePrefix("BfinExecutor-");
+        executor.setThreadNamePrefix("RepairExecutor-");
         executor.initialize();
         return executor;
     }
