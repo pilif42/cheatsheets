@@ -1,0 +1,27 @@
+- I created a brand new Spring Boot app which can delete users from Azure Active Directory B2C using the
+Microsoft Graph API. As part of this, I had to register my app following https://docs.microsoft.com/en-us/azure/active-directory-b2c/microsoft-graph-get-started?tabs=app-reg-ga#enable-user-delete-and-password-update
+
+Inside the app, I have got an OAuth2TokenGenerator:
+
+@Override
+public TokenResponse generateToken(String resource) {
+    log.info("Requesting Access Token from OAuth2 endpoint");
+
+    MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+    params.add("client_id", aadb2cConfiguration.getClientId());
+    params.add("client_secret", aadb2cConfiguration.getSecretValue());
+    params.add("scope", resource + "/.default");
+    params.add("grant_type", "client_credentials");
+
+    String url = String.format("https://login.microsoftonline.com/%s/oauth2/v2.0/token", aadb2cConfiguration.getTenantId());
+
+    TokenResponse response = restTemplate.postForObject(url, params, TokenResponse.class);
+
+    return response;
+}
+
+It is used in an interceptor class for all requests made to the Graph API. It adds a header with:
+headers.add("Authorization", "Bearer " + tokenCache.getToken(graphConfiguration.getUri()));
+
+The delete operation is coded with:
+graphRestTemplate.delete(format("/v1.0/users/%s", userId));

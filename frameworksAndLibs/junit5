@@ -45,3 +45,25 @@ public class BfinServiceImplTest {
         verify(bfinConfiguration, times(1)).getPostPath();
         verify(bfinRestTemplate, times(1)).postForObject(POST_PATH, request, InternalCaseDto.class);
     }
+
+
+- How to unit test a System.exit:
+Import:
+<dependency>
+   <groupId>com.ginsberg</groupId>
+   <artifactId>junit5-system-exit</artifactId>
+   <version>1.0.0</version>
+   <scope>test</scope>
+</dependency>
+
+And
+
+@Test
+@ExpectSystemExitWithStatus(0)
+public void run_happyPath() {
+    // WHEN
+    theApp.run();
+
+    // THEN
+    verify(masterService, times(1)).process();
+}

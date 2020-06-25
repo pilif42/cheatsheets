@@ -1,0 +1,21 @@
+- Query for clustering:
+Using Microsoft SQL Server, a possible implementation for server-side clustering of points on a map could
+use a query such as:
+
+select count(1),
+  (((geometry::ConvexHullAggregate(location)).STBuffer(0.00001)).STCentroid()).STAsText(),
+   (geometry::ConvexHullAggregate(location)).STAsText(),
+   round(location.STX, 1) as x,
+   round(location.STY,1) as y
+from error_omission
+where error_reference > 54
+group by round(location.STX, 1), round(geom.STY,1)
+
+This rounds the X and Y coords and aggregates points with the same coords together, giving us collections
+of points by a grid. We can change the grid, making it smaller by increasing the integer in the round
+function (number of decimal places). From the collection, we draw a Convex Hull around the points (a point,
+ line or polygon that encloses all the points with convex curves only). We buffer that shape to ensure it
+ is a Polygon and obtain the Centroid point.
+
+Note that the where clause is because the location for entry 54 seems to cause the convexHull to return null.
+ 
