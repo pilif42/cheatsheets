@@ -1,0 +1,122 @@
+- To install it, I followed https://kubernetes.io/docs/tasks/tools/install-minikube/
+      - To check if virtualization is supported on Linux, run the following command and verify that the output is non-empty:
+            grep -E --color 'vmx|svm' /proc/cpuinfo
+
+      - Install a Hypervisor (KVM on ubuntu 20.04.lts): I followed partially https://www.linuxtechi.com/install-kvm-on-ubuntu-20-04-lts-server/
+            - verify that my laptop supports hardware virtualization:
+                  - grep -E -c "vmx|svm" /proc/cpuinfo
+                      -> 8 which is > 0 so OK.
+            - verify that KVM based virtual machines can be installed on my laptop:
+                  - sudo apt install -y cpu-checker
+                  - kvm-ok
+                      ->  INFO: /dev/kvm exists
+                          KVM acceleration can be used
+            - install KVM, bridge-utils, virt-manager and other kvm dependencies:
+                  - sudo apt install -y qemu qemu-kvm libvirt-daemon bridge-utils virt-manager virtinst
+                  - verify whether KVM module is loaded:
+                        - lsmod | grep -i kvm
+            - start and verify the libvirtd service:
+                  - sudo systemctl status libvirtd.service
+                        - ours was active so all good. If it is not started for any reason, use: sudo systemctl enable libvirtd --now
+            - create virtual machines with virt-manager & virt-install:
+                  - sudo apt update
+                  - sudo apt-get install xorg -y
+                  - sudo reboot
+                  - sudo virt-manager
+                      - Note that I started the UI but I did not create a VM.
+            - load and enable the modulevhost-net.
+                  - sudo modprobe vhost_net
+                  - sudo lsmod | grep vhost
+                  - echo "vhost_net" | sudo tee -a /etc/modules
+
+      - Install minikube: I followed https://computingforgeeks.com/how-to-run-minikube-on-kvm/
+            - I verified that I have got Docker already:
+                  - sudo docker version
+            - Download Minikube:
+                  - wget https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+                  - chmod +x minikube-linux-amd64
+                  - sudo mv minikube-linux-amd64 /usr/local/bin/minikube
+                  - minikube version
+                        -> minikube version: v1.11.0
+            - Install kubectl:
+                  - curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+                  - chmod +x kubectl
+                  - sudo mv kubectl  /usr/local/bin/
+                  - kubectl version -o json
+                        -> "gitVersion": "v1.18.5"
+            - Install Docker Machine KVM driver:
+                  - curl -LO https://storage.googleapis.com/minikube/releases/latest/docker-machine-driver-kvm2
+                  - chmod +x docker-machine-driver-kvm2
+                  - sudo mv docker-machine-driver-kvm2 /usr/local/bin/
+                  - docker-machine-driver-kvm2 version
+                        -> v1.11.0
+            - Starting Minikube on KVM:
+                  - Set KVM as default driver:
+                        - minikube config set vm-driver kvm2
+                  - The minikube start command downloads a VM image and configures the Kubernetes single node cluster for you:
+                        - minikube start --vm-driver kvm2
+                  - Confirm that everything is working fine:
+                        - sudo virsh list
+                              ->  Id   Name       State
+                                  --------------------------
+                                   1    minikube   running
+            - Minikube Basic operations:
+                  - check cluster status: kubectl cluster-info
+                  - view config: kubectl config view
+                        - the file is at ~/.minikube/machines/minikube/config.json
+                  - check nodes: kubectl get nodes
+                  - access minikube VM using ssh: minikube ssh
+                        - cat /etc/os-release
+                        - docker ps
+                  - verify its status: minikube status
+                  - stop a running local kubernetes cluster: minikube stop
+                  - delete a local kubernetes cluster: minikube delete
+            - Enable Kubernetes Dashboard:
+                  - verify installed addons: minikube addons list
+                  - if not started yet: minikube start
+                  - minikube dashboard
+                        - it opens a browser at http://127.0.0.1:33765/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/#/overview?namespace=default
+                  - to get its url: minikube dashboard --url
+
+
+- Run a sample app on Kubernetes using Minikube locally:
+    - I followed instructions at https://kubernetes.io/docs/tutorials/hello-minikube/.
+    - minikube start
+    - minikube dashboard
+        - it opens automatically a browser at http://127.0.0.1:36371/api/v1/namespaces/kubernetes-dashboard/services/http:kubernetes-dashboard:/proxy/#/overview?namespace=default
+    - Create a Deployment:
+        - A Kubernetes Pod is a group of one or more Containers, tied together for the purposes of administration and
+        networking. The Pod in this tutorial has only one Container. A Kubernetes Deployment checks on the health of your
+        Pod and restarts the Pod's Container if it terminates. Deployments are the recommended way to manage the creation
+        and scaling of Pods.
+        - create with: kubectl create deployment hello-node --image=k8s.gcr.io/echoserver:1.4
+        - view the Deployment: kubectl get deployments
+        - view the Pod: kubectl get pods
+        - view cluster events: kubectl get events
+        - view the kubectl configuration: kubectl config view
+    - Create a Service:
+        - By default, the Pod is only accessible by its internal IP address within the Kubernetes cluster. To make the
+        hello-node Container accessible from outside the Kubernetes virtual network, you have to expose the Pod as a
+        Kubernetes Service.
+        - Expose the Pod to the public internet using the kubectl expose command:
+              - kubectl expose deployment hello-node --type=LoadBalancer --port=8080
+              - The --type=LoadBalancer flag indicates that you want to expose your Service outside of the cluster.
+        - View the Service you just created: kubectl get services
+        - On cloud providers that support load balancers, an external IP address would be provisioned to access the
+        Service. On Minikube, the LoadBalancer type makes the Service accessible through the minikube service command:
+              - minikube service hello-node
+    - Enable addons:
+        - List the currently supported addons: minikube addons list
+        - Enable an addon, for example, metrics-server: minikube addons enable metrics-server
+        - View the Pod and Service you just created: kubectl get pod,svc -n kube-system
+        - Disable metrics-server: minikube addons disable metrics-server
+    - Clean up:
+        - Now you can clean up the resources you created in your cluster:
+              kubectl delete service hello-node
+              kubectl delete deployment hello-node
+        - Optionally, stop the Minikube virtual machine (VM): minikube stop
+        - Optionally, delete the Minikube VM: minikube delete
+
+
+- next TODO:
+      - https://kubernetes.io/docs/setup/learning-environment/minikube/
