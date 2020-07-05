@@ -134,5 +134,9 @@
         - Specifying the Kubernetes version: minikube start --kubernetes-version v1.18.0
         - Specifying the VM driver: minikube start --driver=<driver_name>
               - in our setup, we have set kvm2 as the default driver.
-    - TODO Restart at https://kubernetes.io/docs/setup/learning-environment/minikube/#starting-a-cluster-on-alternative-container-runtimes
-    
+    - Reusing Minikube's built-in Docker daemon:
+        - minikube docker-env
+              - This gives you the cmd to type to work with the Docker daemon on your Mac/Linux host: eval $(minikube -p minikube docker-env)
+        - You can now use Docker at the command line of your host Mac/Linux machine to communicate with the Docker daemon inside the Minikube VM:
+              - docker ps
+    - Other settings are explained at https://kubernetes.io/docs/setup/learning-environment/minikube/.
