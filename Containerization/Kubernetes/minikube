@@ -79,7 +79,7 @@
                   - to get its url: minikube dashboard --url
 
 
-- Run a sample app on Kubernetes using Minikube locally:
+- Run a sample app on Kubernetes using Minikube locally:- Run a sample app on Kubernetes using Minikube locally:
     - I followed instructions at https://kubernetes.io/docs/tutorials/hello-minikube/.
     - minikube start
     - minikube dashboard
@@ -91,7 +91,7 @@
         and scaling of Pods.
         - create with: kubectl create deployment hello-node --image=k8s.gcr.io/echoserver:1.4
         - view the Deployment: kubectl get deployments
-        - view the Pod: kubectl get pods
+  - Run a sample app on Kubernetes using Minikube locally:      - view the Pod: kubectl get pods
         - view cluster events: kubectl get events
         - view the kubectl configuration: kubectl config view
     - Create a Service:
@@ -118,5 +118,21 @@
         - Optionally, delete the Minikube VM: minikube delete
 
 
-- next TODO:
-      - https://kubernetes.io/docs/setup/learning-environment/minikube/
+- Run a sample app on Kubernetes using Minikube locally:
+    - Same as above but using a NodePort rather than a LoadBalancer.
+    - kubectl create deployment hello-minikube --image=k8s.gcr.io/echoserver:1.10
+    - kubectl expose deployment hello-minikube --type=NodePort --port=8080
+    - Check if the Pod is up and running: kubectl get pod
+    - Get the URL of the exposed Service to view the Service details: minikube service hello-minikube --url
+    - kubectl delete services hello-minikube
+    - kubectl delete deployment hello-minikube
+
+
+- Managing your Cluster:
+    - Starting a Cluster:
+        - minikube start
+        - Specifying the Kubernetes version: minikube start --kubernetes-version v1.18.0
+        - Specifying the VM driver: minikube start --driver=<driver_name>
+              - in our setup, we have set kvm2 as the default driver.
+    - TODO Restart at https://kubernetes.io/docs/setup/learning-environment/minikube/#starting-a-cluster-on-alternative-container-runtimes
+    
