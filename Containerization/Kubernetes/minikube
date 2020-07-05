@@ -140,3 +140,7 @@
         - You can now use Docker at the command line of your host Mac/Linux machine to communicate with the Docker daemon inside the Minikube VM:
               - docker ps
     - Other settings are explained at https://kubernetes.io/docs/setup/learning-environment/minikube/.
+
+
+- TODO: https://kubernetes.io/docs/tutorials/stateless-application/
+- TODO: Deploy one of my apps.
