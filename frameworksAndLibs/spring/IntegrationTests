@@ -1,4 +1,4 @@
-If you do not have time for anything else, at least create a test similar to the one below. This test
+- If you do not have time for anything else, at least create a test similar to the one below. This test
 proves that the application can be loaded successfully and that all @configurations and dependencies are
 there.
 
@@ -23,3 +23,45 @@ public class ApplicationTestIT {
                               assertThat(this.context).isNotNull();
                }
 }
+
+
+- To restrict the loaded application context in a Spring Integration test:
+This is important to spin off the context rapidly when you do not need the entire application context. It is also called
+slicing as described at https://www.baeldung.com/spring-tests#5-using-test-slices
+
+@SpringBootTest(classes = {ClusterGridSettingService.class})
+@EnableConfigurationProperties(value = ClusterConfig.class)
+public class ClusterGridSettingServiceTest {
+    @Autowired
+    private ClusterGridSettingService clusterGridSettingService;
+
+    @ParameterizedTest
+    @CsvSource({"500,10d", "1000,10d", "1100,10d", "1500,10d", "1800,5d", "129000,0.078125", "250000,0.0390625", "256000,0.0390625", "500000,0.0390625"})
+    public void getBestSuitedCoordinateMultiplierTest(int clusterSize, double expectedResult) {
+        assertEquals(expectedResult, clusterGridSettingService.getBestSuitedCoordinateMultiplier(clusterSize));
+    }
+}
+
+As we only want to test ClusterGridSettingService which only relies on ClusterConfig as the below shows:
+@Service
+public class ClusterGridSettingService {
+    private final ClusterConfig clusterConfig;
+
+    public ClusterGridSettingService(ClusterConfig clusterConfig) {
+        this.clusterConfig = clusterConfig;
+    }
+
+    /**
+     * Returns the best suited coordinateMultiplier.
+     * @param clusterSize provided in metres.
+     */
+    public Double getBestSuitedCoordinateMultiplier(Integer clusterSize) {
+        Map<Integer, Double> clusterInfoMap = clusterConfig.getCoordMultiplierMap();
+        Set<Integer> keySet = clusterInfoMap.keySet();
+        int matchingKey = keySet.stream()
+                .min(Comparator.comparingInt(i -> Math.abs(i - clusterSize)))
+                .orElseThrow(() -> new NoSuchElementException("No value present"));
+        return clusterInfoMap.get(matchingKey);
+    }
+}
+ 
