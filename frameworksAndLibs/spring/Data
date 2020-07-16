@@ -284,6 +284,12 @@ public class ErrorOmission {
 }
 
 
+Note the importance of @Enumerated(EnumType.STRING) on Enum fields part of the
+Entity and that need to be stored as a String. If you forget it, Spring JPA will
+assume that it is an Integer for some reasons. On storing to the DB, it will be
+OK. However, when fetching from the DB, you will encounter some NumberFormatExceptions.
+
+
 - Example with @Embeddable:
 
 The main Entity is:
