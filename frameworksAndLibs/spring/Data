@@ -523,3 +523,47 @@ List<ErrorOmission> getErrorOmissionsToBeRepaired(Instant instantStart, Instant 
 
 The important thing to note is the ‘left’ before ‘join’. Without it, if an error does not have a product, it will not be
  returned in the result list.
+
+
+- JPA native queries used when implementing a server-side clustering (pointing to a Microsoft SQL Server db):
+@Profile("sqlserver")
+public interface ErrorOmissionRepository extends PagingAndSortingRepository<ErrorOmission, Long>, JpaSpecificationExecutor<ErrorOmission> {
+    ErrorOmission findByErrorReference(Long errorReference);
+
+    @Query(value = "select * from error_omission e where location.STX = :x and location.STY = :y", nativeQuery = true)
+    ErrorOmission getErrorOmission(double x, double y);
+
+    /**
+     * EandOs with a CLOSED status or a REJECTED resolution are filtered out.
+     */
+    @Query(value = "select count(1) numberOfIssues, (((geometry\\:\\:ConvexHullAggregate(location)).STBuffer(0.00001)).STCentroid()).STAsText() centre from error_omission where (status <> 'CLOSED' or resolution <> 'REJECTED') and location.STX >= :bottomLeftCornerX and location.STX <= :topRightCornerX and location.STY >= :bottomLeftCornerY and location.STY <= :topRightCornerY group by round(location.STX * :coordinateMultiplier, -4), round(location.STY * :coordinateMultiplier, -4)",
+            nativeQuery = true)
+    Set<Cluster> getClustersForAllDevelopers(double bottomLeftCornerX, double bottomLeftCornerY, double topRightCornerX, double topRightCornerY, double coordinateMultiplier);
+
+    /**
+     * EandOs with a CLOSED status or a REJECTED resolution are filtered out.
+     */
+    @Query(value = "select count(1) numberOfIssues, (((geometry\\:\\:ConvexHullAggregate(location)).STBuffer(0.00001)).STCentroid()).STAsText() centre, STRING_AGG(error_reference, ',') as errorRefs from (select error_reference, location from error_omission where error_reference in (SELECT error_reference FROM error_omission where (status <> 'CLOSED' or resolution <> 'REJECTED') and location.STX >= :bottomLeftCornerX and location.STX <= :topRightCornerX and location.STY >= :bottomLeftCornerY and location.STY <= :topRightCornerY)) AS displayableEandOs group by round(location.STX * :coordinateMultiplier,-4), round(location.STY * :coordinateMultiplier, -4)",
+            nativeQuery = true)
+    Set<Cluster> getClustersForAllDevelopersIncludingErrorRefs(double bottomLeftCornerX, double bottomLeftCornerY, double topRightCornerX, double topRightCornerY, double coordinateMultiplier);
+
+    @Query(value = "select count(1) numberOfIssues, (((geometry\\:\\:ConvexHullAggregate(location)).STBuffer(0.00001)).STCentroid()).STAsText() centre, STRING_AGG(error_reference, ',') as errorRefs, SUM(my_error) numberOfIssuesOwnedByMe from (select error_reference, location, my_error = case when developer_id = :developerId then 1 else 0 end FROM error_omission where error_reference in (SELECT error_reference FROM error_omission where location.STX >= :bottomLeftCornerX and location.STX <= :topRightCornerX and location.STY >= :bottomLeftCornerY and location.STY <= :topRightCornerY and status <> 'CLOSED' and developer_id = :developerId UNION SELECT error_reference FROM error_omission where location.STX >= :bottomLeftCornerX and location.STX <= :topRightCornerX and location.STY >= :bottomLeftCornerY and location.STY <= :topRightCornerY and status not in ('SUBMITTED', 'CLOSED') and developer_id <> :developerId)) AS displayableEandOs group by round(location.STX * :coordinateMultiplier,-4), round(location.STY * :coordinateMultiplier, -4)",
+            nativeQuery = true)
+    Set<Cluster> getClustersForSpecificDeveloper(double bottomLeftCornerX, double bottomLeftCornerY, double topRightCornerX, double topRightCornerY, double coordinateMultiplier, String developerId);
+}
+
+Note that we had to use a Profile at the interface level because it was not possible to find queries working in both
+Microsoft SQL Server and H2/H2GIS. Among other things, spatial functions are different. In Microsoft SQL Server, we use
+ ConvexHullAggregate. In H2GIS, it does not exist and its equivalent is ST_ConvexHull.
+
+Note how the mapping to a non-entity bean is done: we return a set of Cluster where
+public interface Cluster {
+    Long getNumberOfIssues();
+    String getCentre();
+    String getErrorRefs();
+    Long getNumberOfIssuesOwnedByMe();
+}
+
+Note how the :: in front of ConvexHullAggregate is escaped with \\.
+
+Note how columns are given aliases. Without these, you get runtime exceptions.

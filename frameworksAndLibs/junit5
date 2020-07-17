@@ -67,3 +67,9 @@ public void run_happyPath() {
     // THEN
     verify(masterService, times(1)).process();
 }
+
+
+- How to create a Parameterized test with 2 params:
+@ParameterizedTest
+@CsvSource({"null,null", "null,false", "null,true", "\"joeblog@gmail.com\",null", "\"joeblog@gmail.com\",false", "\"joeblog@gmail.com\",true"})
+public void populate_emptyInputSet_expectEmptyResultSet(String developerId, Boolean includeErrors) {
