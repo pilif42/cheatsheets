@@ -91,7 +91,8 @@
         and scaling of Pods.
         - create with: kubectl create deployment hello-node --image=k8s.gcr.io/echoserver:1.4
         - view the Deployment: kubectl get deployments
-  - Run a sample app on Kubernetes using Minikube locally:      - view the Pod: kubectl get pods
+  - Run a sample app on Kubernetes using Minikube locally:
+        - view the Pod: kubectl get pods
         - view cluster events: kubectl get events
         - view the kubectl configuration: kubectl config view
     - Create a Service:
@@ -142,5 +143,5 @@
     - Other settings are explained at https://kubernetes.io/docs/setup/learning-environment/minikube/.
 
 
-- TODO: https://kubernetes.io/docs/tutorials/stateless-application/
-- TODO: Deploy one of my apps.
+- Deploy one of my apps:
+    - see project springBootAndKubernetes
