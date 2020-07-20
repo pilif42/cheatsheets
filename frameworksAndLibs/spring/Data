@@ -567,3 +567,61 @@ public interface Cluster {
 Note how the :: in front of ConvexHullAggregate is escaped with \\.
 
 Note how columns are given aliases. Without these, you get runtime exceptions.
+
+
+- To be able to use the H2 console:
+When developing a Spring Boot app using a database, it may be useful to point to a H2 DB during development and to send
+SQL queries to it. To achieve this, you can enable the H2 console by doing the following.
+
+Add the dependencies (if you need both H2 & H2GIS):
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <version>${h2.version}</version>
+    <scope>runtime</scope>
+</dependency>
+<!-- https://mvnrepository.com/artifact/org.orbisgis/h2gis -->
+<dependency>
+    <groupId>org.orbisgis</groupId>
+    <artifactId>h2gis</artifactId>
+    <version>${h2.gis.version}</version>
+    <exclusions>
+        <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+        </exclusion>
+        <exclusion>
+            <groupId>org.locationtech.jts</groupId>
+            <artifactId>jts-core</artifactId>
+        </exclusion>
+    </exclusions>
+    <scope>runtime</scope>
+</dependency>
+
+Create a file called application-h2.properties with:
+spring.jpa.properties.hibernate.dialect=org.hibernate.spatial.dialect.h2geodb.GeoDBDialect
+
+spring.datasource.url=jdbc:h2:mem:eando
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+
+spring.h2.console.enabled=true
+
+If you have Spring security enabled, you will also need to add the lines:
+http.headers().frameOptions().disable();
+and
+http.csrf().disable()
+and
+http.authorizeRequests(authorize -> {
+            authorize.antMatchers("/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/h2-console/**").anonymous();
+
+in your class:
+
+@EnableWebSecurity
+public class RoleBasedAdapter extends WebSecurityConfigurerAdapter {
+    protected void configure(HttpSecurity http) throws Exception {
+    ...
+
+Then, after having started the app, go to http://localhost:8081/h2-console if your app runs on 8081. Fill in the details
+as per details entered in application-h2.properties. You should be able to connect to the DB and send SQL queries to it.

@@ -1,0 +1,19 @@
+- To ssh into an Azure instance to verify the deployed .jar for an application:
+Go to the Azure portal home at https://portal.azure.com/
+Select the relevant App Service, e.g. omsedev1errorsomissions
+On the left-hand side, under ‘Development Tools’, select SSH.
+Click on Go -> and it will open a cmd prompt at /home.
+Check the time with: date
+Find the E&O API .jar under /home/site/wwwroot
+
+
+- To understand how the E&O API was deployed in dev:
+Go to the Azure portal at https://portal.azure.com/
+Search for Resource groups
+Find the relevant one, e.g. omsedev1_rg_errorsandomissions
+On the left-hand side, under Settings, select Deployments
+Select deployAppService-omsedev1errorsomissions
+Select Template on the left-hand side: this will display the ARM (Azure Resource Manager) template used
+for the deployment. More details on templates can be found at
+https://docs.microsoft.com/en-gb/azure/azure-resource-manager/templates/overview . This is the recommended
+ way to deploy an app when using a CICD pipeline.
