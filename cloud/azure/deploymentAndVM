@@ -36,3 +36,5 @@ https://docs.microsoft.com/en-gb/azure/azure-resource-manager/templates/overview
           - a topic which has:
                 - 2 policies: 1 Send policy to write msgs to it, 1 Listen to read msgs from it.
                 - 1 Subscription.
+          - all policies were defined using https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-authentication-and-authorization#shared-access-signature
+          
