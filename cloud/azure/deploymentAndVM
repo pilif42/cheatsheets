@@ -17,3 +17,22 @@ Select Template on the left-hand side: this will display the ARM (Azure Resource
 for the deployment. More details on templates can be found at
 https://docs.microsoft.com/en-gb/azure/azure-resource-manager/templates/overview . This is the recommended
  way to deploy an app when using a CICD pipeline.
+
+
+- When a deployment fails (cmd line in PowerShell or pipeline), the place to look for the error details is:
+    - Azure UI -> resource group
+    - search for your relevant resource group and select it
+    - on the left-hand side, under Settings, select Deployments
+    - click on the deployment name having a Failed status. This will list all the steps and their logs.
+
+
+- To put together changes to an existing ARM template, I used:
+      - docs:
+          - https://docs.microsoft.com/en-us/azure/templates/ and its section on 'Service Bus'
+          - for the queue: https://github.com/Azure/azure-quickstart-templates/blob/master/301-servicebus-create-authrule-namespace-and-queue/azuredeploy.json
+          - for the topic: https://github.com/Azure/azure-quickstart-templates/blob/master/201-servicebus-create-topic-subscription-rule/azuredeploy.json
+      - the goal was to create a service bus with:
+          - a queue which has 2 policies: 1 Send to write msgs to it, 1 Listen to read msgs from it.
+          - a topic which has:
+                - 2 policies: 1 Send policy to write msgs to it, 1 Listen to read msgs from it.
+                - 1 Subscription.
