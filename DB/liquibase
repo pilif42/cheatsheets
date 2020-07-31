@@ -22,3 +22,18 @@ In the pom.xml, in the plugins section (<project> <build> <plugins>), add:
       </plugin>
 
 Then, run mvn liquibase:clearCheckSums
+
+
+- To apply some SQL statements only to Azure SQL Server databases (this is required as the function TRY_CONVERT does not
+exist in H2 for instance). Note the mssql.
+- changeSet:
+    id: 5
+    author: pbrossier
+    changes:
+      - sql:
+          dbms: mssql
+          sql: |
+            DELETE FROM VERIFICATION where TRY_CONVERT(UNIQUEIDENTIFIER, organisation_id) IS NULL;
+            DELETE FROM PAYMENT_ATTEMPT where transaction_id in (SELECT transaction_id from PAYMENT where TRY_CONVERT(UNIQUEIDENTIFIER, organisation_id) IS NULL);
+            DELETE FROM PAYMENT where TRY_CONVERT(UNIQUEIDENTIFIER, organisation_id) IS NULL;
+   

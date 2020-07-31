@@ -64,4 +64,42 @@ public class ClusterGridSettingService {
         return clusterInfoMap.get(matchingKey);
     }
 }
- 
+
+
+- Another example where we only want the Controller slice & the Repository slice created at start up. We needed this as
+otherwise, it was attempting to create the Service Bus/Messaging slice. As property values for
+azure.servicebus.connection-string & azure.servicebus.queue-name are not fixed, this was unwanted.
+@SpringBootTest(classes = {LocalConfiguration.class, CardDetailsController.class, Configuration.class, RoleBasedAdapter.class, NamespaceProvider.class})
+@EnableAutoConfiguration
+@EntityScan(basePackages = {"uk.os.omse.monetisation.entity"})
+@EnableJpaRepositories(basePackages = {"com.sample.monetisation.repository"})
+@AutoConfigureMockMvc
+@ActiveProfiles("local,mock")
+public class CardDetailsControllerTests {
+    private UUID organisationId;
+    private String namespace;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private TokensService mockTokensService;
+
+    @MockBean
+    private VerifiedTokensService mockVerifiedTokensService;
+
+    @Autowired
+    private VerificationRepository repo;
+
+    @BeforeEach
+    public void setup() {
+        organisationId = UUID.randomUUID();
+        namespace = "DATAHUB_CARD_" + organisationId;
+
+        Mockito.reset(mockTokensService, mockVerifiedTokensService);
+        try {
+            repo.deleteById(organisationId);
+        } catch(Exception e) {
+            // The record probably didn't exist
+        }
+    }
