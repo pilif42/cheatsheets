@@ -73,3 +73,86 @@ public void run_happyPath() {
 @ParameterizedTest
 @CsvSource({"null,null", "null,false", "null,true", "\"joeblog@gmail.com\",null", "\"joeblog@gmail.com\",false", "\"joeblog@gmail.com\",true"})
 public void populate_emptyInputSet_expectEmptyResultSet(String developerId, Boolean includeErrors) {
+
+
+- A good way to unit test a RetryConfig:
+package com.sample.config;
+
+import com.microsoft.azure.servicebus.primitives.ServiceBusException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.retry.support.RetryTemplate;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class RetryConfigTest {
+    private RetryConfig retryConfig;
+
+    @BeforeEach
+    public void setup() {
+        TopicConfiguration topicConfiguration = new TopicConfiguration();
+        TopicConfiguration.RetryProperties retryProperties = new TopicConfiguration.RetryProperties();
+        retryProperties.setInitialInterval(100);
+        retryProperties.setMaxAttempts(3);
+        retryProperties.setMultiplier(2.0);
+        retryProperties.setMaxInterval(5000);
+        topicConfiguration.setRetry(retryProperties);
+
+        retryConfig = new RetryConfig(topicConfiguration);
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    public void test_topicRetryTemplate_retriableExceptionsAreRetriedThreeTimes(Exception exception) {
+        RetryTemplate topicRetryTemplate = retryConfig.topicRetryTemplate(retryConfig.exponentialBackOffPolicy());
+
+        final AtomicInteger counter = new AtomicInteger(0);
+        int count = -1;
+        try {
+            count = topicRetryTemplate.execute(context -> {
+                counter.incrementAndGet();
+
+                // Return exceptions every time we are called
+                Exception outerException = new Exception("Test exception");
+                outerException.initCause(exception);
+                throw outerException;
+            });
+        } catch(Exception e) {
+            assertEquals("Test exception", e.getMessage());
+        }
+
+        assertEquals(-1, count);
+        assertEquals(3, counter.get());
+    }
+
+   private static Stream<Exception> test_topicRetryTemplate_retriableExceptionsAreRetriedThreeTimes() {
+        return Stream.of(new InterruptedException(), new ServiceBusException(true));
+    }
+
+    @Test
+    public void test_topicRetryTemplate_NoRetriesForOtherExceptions() {
+        RetryTemplate topicRetryTemplate = retryConfig.topicRetryTemplate(retryConfig.exponentialBackOffPolicy());
+
+        final AtomicInteger counter = new AtomicInteger(0);
+        int count = -1;
+        try {
+            count = topicRetryTemplate.execute(context -> {
+                counter.incrementAndGet();
+
+                // Return exceptions every time we are called
+                Exception outerException = new Exception("Test exception");
+                throw outerException;
+            });
+        } catch(Exception e) {
+            assertEquals("Test exception", e.getMessage());
+        }
+
+        assertEquals(-1, count);
+        assertEquals(1, counter.get());
+    }
+}
