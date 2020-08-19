@@ -625,3 +625,9 @@ public class RoleBasedAdapter extends WebSecurityConfigurerAdapter {
 
 Then, after having started the app, go to http://localhost:8081/h2-console if your app runs on 8081. Fill in the details
 as per details entered in application-h2.properties. You should be able to connect to the DB and send SQL queries to it.
+
+
+- @DataJpaTest failing with java.lang.IllegalStateException: Failed to load ApplicationContext
+    - Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.sample.appinsights.TelemetryEventLogger' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+    - solution: annotate the test class with @org.springframework.context.annotation.Import(TelemetryEventLogger.class)
+     
