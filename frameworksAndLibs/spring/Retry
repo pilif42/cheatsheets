@@ -63,3 +63,131 @@ public class RetryConfig {
         return retryTemplate;
     }
 }
+
+
+- Using a Retry and controlling what to do when all retries have been exhausted:
+
+The service is:
+package com.sample.apigee.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.retry.RecoveryCallback;
+import org.springframework.retry.RetryCallback;
+import org.springframework.retry.RetryContext;
+import org.springframework.retry.support.RetryTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+import com.sample.apigee.dto.AttributeDto;
+import com.sample.apigee.dto.DeveloperDto;
+import com.sample.appinsights.TelemetryEventLogger;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+
+import static java.lang.String.format;
+
+@Service
+public class ApigeeService {
+    private static final Logger log = LoggerFactory.getLogger(ApigeeService.class);
+
+    private final RetryTemplate apiRetryTemplate;
+    private final RestTemplate apigeeRestTemplate;
+    private final TelemetryEventLogger telemetryEventLogger;
+
+    public ApigeeService(RetryTemplate apiRetryTemplate, RestTemplate apigeeRestTemplate, TelemetryEventLogger telemetryEventLogger) {
+        this.apiRetryTemplate = apiRetryTemplate;
+        this.apigeeRestTemplate = apigeeRestTemplate;
+        this.telemetryEventLogger = telemetryEventLogger;
+    }
+
+    public void updateAttribute(UUID organisationId, String attributeName, String attributeValue) {
+        String emailAddress = format("Account.%s@sample.com", organisationId.toString());
+        String url = format("/developers/%s", emailAddress);
+
+        apiRetryTemplate.execute(new RetryCallback<Void, HttpClientErrorException>() {
+                                     public Void doWithRetry(RetryContext context) {
+                                         DeveloperDto developerDto = apigeeRestTemplate.getForObject(url, DeveloperDto.class);
+                                         setAttribute(developerDto, attributeName, attributeValue);
+
+                                         apigeeRestTemplate.put(url, new HttpEntity<>(developerDto));
+                                         return null;
+                                     }
+                                 }, new RecoveryCallback<Void>() {
+                                     @Override
+                                     public Void recover(RetryContext retryContext) throws Exception {
+                                         log.error("All attempts to update attribute {} with value {} on developer {} have failed.", attributeName, attributeValue, emailAddress, retryContext.getLastThrowable());
+                                         telemetryEventLogger.apigeeAttributeSettingFailed(emailAddress, attributeName, attributeValue);
+                                         return null;
+                                     }
+                                 }
+        );
+    }
+
+    private void setAttribute(DeveloperDto developerDto, String attributeName, String attributeValue) {
+        AttributeDto newAttributeDto = AttributeDto.builder().name(attributeName).value(attributeValue).build();
+
+        List<AttributeDto> attributeDtoList = developerDto.getAttributes();
+        if (CollectionUtils.isEmpty(attributeDtoList)) {
+            developerDto.setAttributes(Collections.singletonList(newAttributeDto));
+        } else {
+            boolean existingAttribute = false;
+            for (AttributeDto attributeDto : attributeDtoList) {
+                if (attributeDto.getName().equalsIgnoreCase(attributeName)) {
+                    attributeDto.setName(attributeName);
+                    attributeDto.setValue(attributeValue);
+                    existingAttribute = true;
+                    break;
+                }
+            }
+            if (!existingAttribute) {
+                attributeDtoList.add(newAttributeDto);
+            }
+        }
+    }
+}
+
+The Retry template is defined in:
+package com.sample.apigee.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.support.RetryTemplate;
+import com.sample.apigee.retry.ApiRetryPolicy;
+
+@Configuration
+@EnableRetry
+public class RetryConfig {
+    private final ApigeeConfiguration apigeeConfiguration;
+
+    public RetryConfig(ApigeeConfiguration apigeeConfiguration) {
+        this.apigeeConfiguration = apigeeConfiguration;
+    }
+
+    @Bean
+    public FixedBackOffPolicy fixedBackOffPolicy() {
+        FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
+        backOffPolicy.setBackOffPeriod(apigeeConfiguration.getRetry().getInterval());
+        return backOffPolicy;
+    }
+
+    @Bean
+    public RetryTemplate apiRetryTemplate(FixedBackOffPolicy fixedBackOffPolicy) {
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        ApiRetryPolicy apiRetryPolicy = new ApiRetryPolicy();
+        ApigeeConfiguration.RetryProperties retryProperties = apigeeConfiguration.getRetry();
+        apiRetryPolicy.setMaxAttempts(retryProperties.getMaxAttempts());
+        retryTemplate.setRetryPolicy(apiRetryPolicy);
+
+        retryTemplate.setBackOffPolicy(fixedBackOffPolicy);
+
+        return retryTemplate;
+    }
+}
