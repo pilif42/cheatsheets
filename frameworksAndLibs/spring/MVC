@@ -29,8 +29,7 @@ public RestTemplate localMyRestTemplate(final RestTemplateBuilder restTemplateBu
 }
 
 
-- Endpoints should not be vulnerable to reflected cross-site scripting (XSS)
-attacks:
+- Endpoints should not be vulnerable to reflected cross-site scripting (XSS) attacks:
 
 import org.owasp.encoder.Encode;
 

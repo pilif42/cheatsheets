@@ -1,0 +1,98 @@
+- Create your own validation tag InstantString:
+
+The tag itself:
+package com.sample.validation;
+
+import javax.validation.Constraint;
+import javax.validation.Payload;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.PARAMETER;
+
+@Constraint(validatedBy = InstantStringParameterValidator.class)
+@Target({ FIELD, PARAMETER })
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface InstantString {
+    String message() default
+            "must be a string parsable into an Instant. An example is a string matching the pattern yyyy-MM-ddTHH:mm:ss.SSSZ";
+
+    Class<?>[] groups() default {};
+
+    Class<? extends Payload>[] payload() default {};
+}
+
+
+The validator:
+package com.sample.validation;
+
+import com.sample.util.InstantUtil;
+
+import javax.validation.ConstraintValidator;
+import javax.validation.ConstraintValidatorContext;
+import java.time.format.DateTimeParseException;
+
+public class InstantStringParameterValidator implements ConstraintValidator<InstantString, String> {
+    public void initialize(InstantString constraint) {
+    }
+
+    public boolean isValid(String instantString, ConstraintValidatorContext context) {
+        if (instantString != null) {
+            try {
+                InstantUtil.transformDateString(instantString);
+            } catch (DateTimeParseException e) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+
+The validator's unit test:
+package com.sample.validation;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class InstantStringParameterValidatorTest {
+    private InstantStringParameterValidator validator;
+
+    @BeforeEach
+    public void setup() {
+        validator = new InstantStringParameterValidator();
+    }
+
+    @Test
+    public void nullInputIsValid() {
+        // Validation spec recommends null is a valid value and @NotNull is used if required
+        assertTrue(validator.isValid(null, null));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"random", "2020-09-18"})
+    public void nonParsableIntoInstantStringIsInvalid(String input) {
+        assertFalse(validator.isValid(input, null));
+    }
+
+    @ParameterizedTest()
+    @ValueSource(strings = {"2020-09-18T07:59:13.235489500Z", "2020-09-18T07:59:13.789Z", "2020-09-18T07:59:13Z"})
+    public void parsableIntoInstantStringIsValid(String input) {
+        assertTrue(validator.isValid(input,null));
+    }
+}
+
+
+And in the Controller, we need:
+    - at the class level: @Validated where import org.springframework.validation.annotation.Validated;
+    - at a method level: @RequestParam(required = false) @Valid @InstantString String createdDateFrom
