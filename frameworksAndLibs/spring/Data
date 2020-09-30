@@ -630,4 +630,17 @@ as per details entered in application-h2.properties. You should be able to conne
 - @DataJpaTest failing with java.lang.IllegalStateException: Failed to load ApplicationContext
     - Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.sample.appinsights.TelemetryEventLogger' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
     - solution: annotate the test class with @org.springframework.context.annotation.Import(TelemetryEventLogger.class)
-     
+
+
+- Good example to show how to handle the possibility for parameters (single object and collection) to be null:
+@Query(value = "SELECT p FROM Payment p WHERE p.organisationId = :organisationId" +
+        " AND (:billingYear IS NULL OR p.billingYear = :billingYear)" +
+        " AND (:billingMonth IS NULL OR p.billingMonth = :billingMonth)" +
+        " AND (COALESCE(:paymentStatusFilters, NULL) IS NULL OR p.status IN :paymentStatusFilters)")
+Page<Payment> findPaymentsWithinBillingPeriod(
+        @Param("organisationId") UUID organisationId,
+        @Param("billingYear") Integer billingYear,
+        @Param("billingMonth") Integer billingMonth,
+        @Param("paymentStatusFilters") Set<PaymentStatus> paymentStatusFilters,
+        Pageable pageable);
+        
