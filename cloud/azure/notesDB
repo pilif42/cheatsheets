@@ -7,3 +7,11 @@
           - Select one for E&O = dev1_rg_errorsandomissions
           - Select dev1-eando
           - Select 'Create database' and call it eando-pb.
+
+
+- Enabling connection to a DB in the Cloud from an OS laptop (so I can send sql query from IntelliJ):
+    - Go to the resource group prd_rg_errorsandomissions
+    - Select prdsqlsvrerrorsomissions (the SQL server, not the SQL database)
+    - Select Firewalls and virtual networks under Security
+    - Add a rule: name = OSNetwork, start IP = aa.xxx.yyy.zzz, end IP = aa.xxx.yyy.zzz
+    - Save

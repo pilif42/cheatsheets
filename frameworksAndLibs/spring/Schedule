@@ -1,0 +1,65 @@
+- Example of a bespoke scheduler:
+The main advantage (compared to using @EnableScheduling and @Scheduled(fixedDelay = 10 * 60 * 1000)) is that we
+can control how we shutdown threads in @PreDestroy.
+This was important in our project running in Azure as when we were doing a new deployment using the DevOps
+pipeline, the old container was killed and a new container was started. The issue is that sometimes threads (which
+ had been started by the scheduler in the old container) were kept running. As a result, the old application .jar
+  was under a file lock and it was left behind as a ghost .jar. This was creating issues when the pipeline was
+  attempting to start the new app using the cmd serviceStartCommand: 'java -jar /home/site/wwwroot/notifications-*.jar'.
+  Especially at times when we were incrementing the project version.
+
+package com.sample.notifications.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+import com.sample.notifications.StatsProcess;
+import com.sample.notifications.config.ApigeeConfiguration;
+
+import javax.annotation.PreDestroy;
+import java.util.Date;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+@Component
+public class StatsProcessScheduler {
+    private static final Logger log = LoggerFactory.getLogger(StatsProcessScheduler.class);
+
+    private final ApigeeConfiguration apigeeConfiguration;
+    private final StatsProcess statsProcess;
+
+    private ScheduledExecutorService executorService;
+
+    public StatsProcessScheduler(ApigeeConfiguration apigeeConfiguration, StatsProcess statsProcess) {
+        this.apigeeConfiguration = apigeeConfiguration;
+        this.statsProcess = statsProcess;
+
+        this.executorService = Executors.newScheduledThreadPool(apigeeConfiguration.getNbThreadsProcessingStats());
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void startup() {
+        log.info("Entering startup...");
+
+        Runnable runnableTask = () -> {
+            try {
+                statsProcess.process();
+            } catch (Exception e) {
+                // Catch all exceptions so tasks are still scheduled afterwards.
+                log.error("Something went wrong", e);
+            }
+        };
+
+        int delay = apigeeConfiguration.getDelayProcessingStatsInMinutes();
+        executorService.scheduleWithFixedDelay(runnableTask, delay, delay, TimeUnit.MINUTES);
+    }
+
+    @PreDestroy
+    public void onShutdown() {
+        log.info("Entering shutdown...");
+        executorService.shutdownNow();
+    }
+}
