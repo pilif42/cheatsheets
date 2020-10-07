@@ -1,8 +1,26 @@
+- When using Azure, set up required before you can do 'npm install':
+      - Add a file .npmrc to your project, in the same directory as your package.json with the content:
+            registry=https://pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/registry/
+            always-auth=true
+
+            ; begin auth token
+            //pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/registry/:username=your_organisation
+            //pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/registry/:_password=BASE64_ENCODED_PERSONAL_ACCESS_TOKEN
+            //pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/registry/:email=npm requires email to be set but doesn't use the value
+            //pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/:username=your_organisation
+            //pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/:_password=BASE64_ENCODED_PERSONAL_ACCESS_TOKEN
+            //pkgs.dev.azure.com/your_organisation/your_project/_packaging/your_project-npm/npm/:email=npm requires email to be set but doesn't use the value
+            ; end auth token
+      - Generate a Personal Access Token with Packaging read & write scopes by going to https://dev.azure.com/your_organisation/_usersSettings/tokens
+      - Base64 encode the personal access token.
+      - Replace both [BASE64_ENCODED_PERSONAL_ACCESS_TOKEN] values in your user .npmrc file with your personal encoded access token.
+
+
 - To run javascript unit tests in GitBash:
 export NODE_EXTRA_CA_CERTS=/c/Temp/taf/certificates/SymantecWSSCerts.pem
 cd /c/Temp/code/myproj-apigee/proxies
 npm install
-npm test -> this will run all tests.
+npm run coverage OR npm test -> this will run all tests.
 npm test IdentifyDataCategory.test.js -> this will run only IdentifyDataCategory.test.js.
 
 
