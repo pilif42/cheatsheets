@@ -643,4 +643,7 @@ Page<Payment> findPaymentsWithinBillingPeriod(
         @Param("billingMonth") Integer billingMonth,
         @Param("paymentStatusFilters") Set<PaymentStatus> paymentStatusFilters,
         Pageable pageable);
-        
+
+
+- Sample code with Cosmos DB:
+https://github.com/Azure-Samples/azure-spring-data-cosmos-java-sql-api-getting-started
