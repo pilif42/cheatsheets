@@ -156,3 +156,83 @@ public class RetryConfigTest {
         assertEquals(1, counter.get());
     }
 }
+
+
+- An option to test a service which makes http calls to an external API:
+Dependencies required
+<dependency>
+   <groupId>org.mock-server</groupId>
+   <artifactId>mockserver-netty</artifactId>
+   <version>${mockServer.version}</version>
+   <scope>test</scope>
+</dependency>
+<dependency>
+   <groupId>org.mock-server</groupId>
+   <artifactId>mockserver-client-java</artifactId>
+   <version>${mockServer.version}</version>
+   <scope>test</scope>
+</dependency>
+
+In your unit test which is annotated with @ExtendWith(MockitoExtension.class), define:
+import static org.mockserver.integration.ClientAndServer.startClientAndServer;
+import static org.mockserver.model.HttpRequest.request;
+import static org.mockserver.model.HttpResponse.response;
+
+@BeforeAll
+public static void startServer() {
+    mockServer = startClientAndServer(PORT);
+    restTemplate = new RestTemplateBuilder()
+            .rootUri(MONETIZATION_API_ROOT_URI)
+            .build();
+}
+
+@AfterAll
+public static void stopServer() {
+    mockServer.stop();
+}
+
+@BeforeEach
+public void setup() {
+mockServer.reset();
+paymentService = new PaymentServiceImpl(restTemplate, telemetryEventLogger);
+}
+
+@Test
+public void test_getPayments_expectOnePayment() throws Exception {
+    // GIVEN
+    File responseFile = ResourceUtils.getFile("classpath:apiResponses/getPayments.json");
+    String data = FileUtils.readFileToString(responseFile, Charsets.UTF_8);
+    mockServer.when(request().withMethod("GET").withPath("/payments/" + TEST_ORG_ID_1)
+            .withQueryStringParameter("billingMonth", BILLING_MONTH.toString())
+            .withQueryStringParameter("billingYear", BILLING_YEAR.toString())
+            .withQueryStringParameter("size", String.valueOf(Integer.MAX_VALUE)))
+            .respond(response()
+                    .withStatusCode(200)
+                    .withContentType(MediaType.APPLICATION_JSON)
+                    .withBody(data));
+
+    // WHEN
+    List<PaymentResponse> res = paymentService.getPayments(TEST_ORG_ID_1, BILLING_MONTH, BILLING_YEAR);
+
+    // THEN
+    assertEquals(1, res.size());
+    assertEquals("FAILED", res.get(0).getStatus());
+}
+
+And under /src/test/resources/apiResponses, getPayments.json which contains:
+{
+  "content": [
+    {
+      "transactionId": "9a24c1d4-9de0-ea11-a813-000d3a44a234-2020-10-000",
+      "organisationId": "9a24c1d4-9de0-ea11-a813-000d3a44a234",
+      ...
+      "status": "FAILED"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "totalElements": 1,
+    "totalPages": 1,
+    "number": 0
+  }
+}
