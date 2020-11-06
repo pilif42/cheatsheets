@@ -1,0 +1,496 @@
+Dependencies
+<dependency>
+   <groupId>org.springframework.boot</groupId>
+   <artifactId>spring-boot-starter-quartz</artifactId>
+</dependency>
+
+
+********************************************************************************
+
+
+Application properties
+spring.quartz.job-store-type=jdbc
+
+quartz.propertyFile=quartz.properties
+quartz.zoneId=Europe/London
+
+# To fire every 01st and 21st of the month at 10am
+quartz.cardExpiryDate.cron=0 0 10 1,21 * ?
+quartz.cardExpiryDate.dayOfOneWeekNotification=21
+# 3 hours
+quartz.cardExpiryDate.retry.waitIntervalInMs=10800000
+quartz.cardExpiryDate.retry.maxNbRetries=3
+spring.datasource.driverClassName=com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+
+********************************************************************************
+
+
+quartz.properties
+
+org.quartz.jobStore.class=org.quartz.impl.jdbcjobstore.JobStoreTX
+org.quartz.jobStore.driverDelegateClass=org.quartz.impl.jdbcjobstore.MSSQLDelegate
+org.quartz.jobStore.dataSource=quartzDataSource
+org.quartz.jobStore.isClustered=true
+org.quartz.scheduler.instanceId=AUTO
+
+# To ensure a clean shutdown
+org.quartz.threadPool.makeThreadsDaemons=true
+org.quartz.scheduler.makeSchedulerThreadDaemon=true
+org.quartz.scheduler.interruptJobsOnShutdown=true
+org.quartz.plugin.shutdownhook.class = org.quartz.plugins.management.ShutdownHookPlugin
+org.quartz.plugin.shutdownhook.cleanShutdown = true
+
+
+********************************************************************************
+
+
+Configuration classes
+
+package com.sample.quartz.config;
+
+import org.quartz.spi.TriggerFiredBundle;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.scheduling.quartz.SpringBeanJobFactory;
+
+/**
+ * Adds auto-wiring support to quartz jobs.
+ * @see "https://gist.github.com/jelies/5085593"
+ */
+public class AutoWiringSpringBeanJobFactory extends SpringBeanJobFactory implements ApplicationContextAware {
+    private transient AutowireCapableBeanFactory beanFactory;
+
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        beanFactory = applicationContext.getAutowireCapableBeanFactory();
+    }
+
+    @Override
+    protected Object createJobInstance(final TriggerFiredBundle bundle) throws Exception {
+        final Object job = super.createJobInstance(bundle);
+        beanFactory.autowireBean(job);
+        return job;
+    }
+}
+
+
+package com.sample.quartz.config;
+
+import org.quartz.JobDetail;
+import org.quartz.ListenerManager;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
+import org.quartz.impl.matchers.KeyMatcher;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.quartz.QuartzDataSource;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.quartz.SchedulerFactoryBean;
+import org.springframework.scheduling.quartz.SpringBeanJobFactory;
+import com.sample.quartz.listener.CardExpiryDateRetriesJobListener;
+import com.sample.quartz.listener.CardExpiryDateJobListener;
+
+import javax.sql.DataSource;
+
+@Configuration
+@EnableAutoConfiguration
+@Order(2)
+public class MainConfig {
+
+    @Value("${quartz.propertyFile}")
+    private String quartzPropertyFile;
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @Bean
+    public SpringBeanJobFactory springBeanJobFactory() {
+        AutoWiringSpringBeanJobFactory jobFactory = new AutoWiringSpringBeanJobFactory();
+        jobFactory.setApplicationContext(applicationContext);
+        return jobFactory;
+    }
+
+    @Bean
+    @QuartzDataSource
+    @ConfigurationProperties(prefix = "spring.datasource")
+    public DataSource quartzDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean
+    public SchedulerFactoryBean scheduler(DataSource quartzDataSource, JobDetail cardExpiryDateJobDetail, Trigger cardExpiryDateTrigger) {
+        SchedulerFactoryBean schedulerFactory = new SchedulerFactoryBean();
+        schedulerFactory.setConfigLocation(new ClassPathResource(quartzPropertyFile));
+        schedulerFactory.setJobFactory(springBeanJobFactory());
+        schedulerFactory.setTriggers(cardExpiryDateTrigger);
+        schedulerFactory.setJobDetails(cardExpiryDateJobDetail);
+        schedulerFactory.setDataSource(quartzDataSource);
+        return schedulerFactory;
+    }
+
+    @Bean
+    public ListenerManager listenerManager(Scheduler scheduler, CardExpiryDateJobListener cardExpiryDateJobListener, JobDetail cardExpiryDateJobDetail, CardExpiryDateRetriesJobListener cardExpiryDateRetriesJobListener, JobDetail cardExpiryDateRetriesJobDetail) throws SchedulerException {
+        ListenerManager listenerManager = scheduler.getListenerManager();
+        listenerManager.addJobListener(cardExpiryDateJobListener, KeyMatcher.keyEquals(cardExpiryDateJobDetail.getKey()));
+        listenerManager.addJobListener(cardExpiryDateRetriesJobListener, KeyMatcher.keyEquals(cardExpiryDateRetriesJobDetail.getKey()));
+        return listenerManager;
+    }
+}
+
+
+package com.sample.quartz.config;
+
+import org.quartz.JobBuilder;
+import org.quartz.JobDetail;
+import org.quartz.SimpleTrigger;
+import org.quartz.Trigger;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.scheduling.quartz.CronTriggerFactoryBean;
+import org.springframework.scheduling.quartz.SimpleTriggerFactoryBean;
+import com.sample.appinsights.TelemetryEventLogger;
+import com.sample.quartz.job.CardExpiryDateJob;
+import com.sample.quartz.job.Group;
+import com.sample.quartz.job.Name;
+import com.sample.quartz.listener.CardExpiryDateRetriesJobListener;
+import com.sample.quartz.listener.CardExpiryDateJobListener;
+
+import java.util.TimeZone;
+
+@Configuration
+@EnableAutoConfiguration
+@Order(1)
+public class CardExpiryDateJobConfig {
+    @Value("${quartz.cardExpiryDate.retry.waitIntervalInMs}")
+    private long waitIntervalInMs;
+
+    /**
+     * The main job.
+     */
+    @Bean
+    public JobDetail cardExpiryDateJobDetail() {
+        return buildCardExpiryDateJobDetail(Name.CARD_EXPIRY_DATE.name());
+    }
+
+    /**
+     * The job to handle retries if an exception is thrown during the main job's execution.
+     */
+    @Bean
+    public JobDetail cardExpiryDateRetriesJobDetail() {
+        return buildCardExpiryDateJobDetail(Name.CARD_EXPIRY_DATE_RETRIES.name());
+    }
+
+    @Bean
+    public CronTriggerFactoryBean cardExpiryDateTrigger(JobDetail cardExpiryDateJobDetail, @Value("${quartz.zoneId}") String zoneId, @Value("${quartz.cardExpiryDate.cron}") String cronExpression) {
+        CronTriggerFactoryBean trigger = new CronTriggerFactoryBean();
+        trigger.setGroup(Group.NOTIFICATION.name());
+        trigger.setName(Name.CARD_EXPIRY_DATE.name());
+        trigger.setJobDetail(cardExpiryDateJobDetail);
+        trigger.setTimeZone(TimeZone.getTimeZone(zoneId));
+        trigger.setCronExpression(cronExpression);
+        return trigger;
+    }
+
+    @Bean
+    public SimpleTriggerFactoryBean cardExpiryDateRetriesTrigger(JobDetail cardExpiryDateRetriesJobDetail) {
+        SimpleTriggerFactoryBean trigger = new SimpleTriggerFactoryBean();
+        trigger.setGroup(Group.NOTIFICATION.name());
+        trigger.setName(Name.CARD_EXPIRY_DATE_RETRIES.name());
+        trigger.setJobDetail(cardExpiryDateRetriesJobDetail);
+        trigger.setStartDelay(waitIntervalInMs);
+        trigger.setRepeatInterval(waitIntervalInMs);
+        trigger.setRepeatCount(SimpleTrigger.REPEAT_INDEFINITELY);
+        return trigger;
+    }
+
+    @Bean
+    public CardExpiryDateJobListener cardExpiryDateJobListener(TelemetryEventLogger telemetryEventLogger, JobDetail cardExpiryDateRetriesJobDetail, Trigger cardExpiryDateRetriesTrigger) {
+        return new CardExpiryDateJobListener(telemetryEventLogger, cardExpiryDateRetriesJobDetail, cardExpiryDateRetriesTrigger);
+    }
+
+    @Bean
+    public CardExpiryDateRetriesJobListener cardExpiryDateRetriesJobListener(TelemetryEventLogger telemetryEventLogger) {
+        return new CardExpiryDateRetriesJobListener(telemetryEventLogger);
+    }
+
+    private JobDetail buildCardExpiryDateJobDetail(String name) {
+        return JobBuilder.newJob().ofType(CardExpiryDateJob.class)
+                .withIdentity(name, Group.NOTIFICATION.name())
+                .storeDurably()
+                .requestRecovery()
+                .build();
+    }
+}
+
+
+********************************************************************************
+
+
+package com.sample.quartz.job;
+public enum Group {
+    NOTIFICATION
+}
+
+
+package com.sample.quartz.job;
+public enum Name {
+    CARD_EXPIRY_DATE, CARD_EXPIRY_DATE_RETRIES;
+}
+
+
+package com.sample.quartz.job;
+import lombok.extern.slf4j.Slf4j;
+import org.quartz.DisallowConcurrentExecution;
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.PersistJobDataAfterExecution;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import com.sample.entity.Verification;
+import com.sample.service.CardManagementService;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoField;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+@Slf4j
+@DisallowConcurrentExecution
+@PersistJobDataAfterExecution
+@Component
+public class CardExpiryDateJob implements Job {
+    @Value("${quartz.zoneId}")
+    private String zoneIdStr;
+
+    @Value("${quartz.cardExpiryDate.dayOfOneWeekNotification}")
+    private int dayOfOneWeekNotification;
+
+    @Autowired
+    private CardManagementService cardManagementService;
+
+    @Override
+    public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+        try {
+            log.info("Starting card expiry date job execution");
+            final Instant now = Instant.now();
+            final ZoneId zoneId = ZoneId.of(zoneIdStr);
+            LocalDateTime ldt = LocalDateTime.now(zoneId);
+
+            int dayOfMonth = ldt.getDayOfMonth();
+            if (dayOfMonth < dayOfOneWeekNotification) {
+                ldt =  ldt.withDayOfMonth(1);
+            } else {
+                ldt = ldt.withDayOfMonth(dayOfOneWeekNotification);
+            }
+            ldt =  ldt.with(ChronoField.NANO_OF_DAY, LocalTime.MIN.toNanoOfDay());
+
+            List<Verification> verificationList = cardManagementService.getExpiringCardsToNotify(ldt.getMonthValue(), ldt.getYear(), ldt.atZone(zoneId).toInstant());
+
+            AtomicBoolean allVerificationsProcessedSuccessfully = new AtomicBoolean(true);
+            verificationList.forEach(verification -> {
+                UUID orgId = verification.getOrganisationId();
+                String verificationUrl = verification.getVerification();
+                try {
+                    cardManagementService.notifyOrganisationOfExpiringCard(orgId, verification.getVerification(), now);
+                } catch (Exception e) {
+                    log.warn("Failed notifying orgId {} of imminent expiry on card with verificationUrl {}", orgId, verificationUrl, e);
+                    allVerificationsProcessedSuccessfully.set(false);
+                }
+            });
+            if (!allVerificationsProcessedSuccessfully.get()) {
+                throw new Exception("Some organisations could not be notified of imminent expiry on card.");
+            }
+
+            log.info("Card expiry date job execution completed");
+        } catch (Exception e) {
+            log.error("Unexpected error!", e);
+            throw new JobExecutionException(e);
+        }
+    }
+}
+
+
+********************************************************************************
+
+
+package com.sample.quartz;
+public final class Constants {
+    public static final String LISTENER_NAME_PATTERN = "%s.%s";
+    private Constants() {
+    }
+}
+
+
+package com.sample.quartz.listener;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.quartz.JobDetail;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.JobKey;
+import org.quartz.JobListener;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
+import com.sample.appinsights.TelemetryEventLogger;
+import com.sample.quartz.Constants;
+import com.sample.quartz.job.Group;
+import com.sample.quartz.job.Name;
+
+import static java.lang.String.format;
+
+@Slf4j
+@RequiredArgsConstructor
+public class CardExpiryDateJobListener implements JobListener {
+
+    private final TelemetryEventLogger telemetryEventLogger;
+    private final JobDetail cardExpiryDateRetriesJobDetail;
+    private final Trigger cardExpiryDateRetriesTrigger;
+
+    @Override
+    public String getName() {
+        return format(Constants.LISTENER_NAME_PATTERN, Group.NOTIFICATION.name(), Name.CARD_EXPIRY_DATE.name());
+    }
+
+    @Override
+    public void jobToBeExecuted(JobExecutionContext jobExecutionContext) {
+    }
+
+    @Override
+    public void jobExecutionVetoed(JobExecutionContext jobExecutionContext) {
+    }
+
+    @Override
+    public void jobWasExecuted(JobExecutionContext jobExecutionContext, JobExecutionException jobExecutionException) {
+        if (jobExecutionException != null) {
+            Scheduler scheduler = jobExecutionContext.getScheduler();
+            JobDetail jobDetail = jobExecutionContext.getJobDetail();
+            JobKey jobKey = jobDetail.getKey();
+
+            JobKey retriesJobKey = cardExpiryDateRetriesJobDetail.getKey();
+            try {
+                scheduler.deleteJob(retriesJobKey); // in case the retries job had failed being deleted in CardExpiryDateRetriesJobListener
+                scheduler.scheduleJob(cardExpiryDateRetriesJobDetail, cardExpiryDateRetriesTrigger);
+                log.info("To attempt retries after Job with key {} failed, Job with key {} has now been scheduled.", jobKey, retriesJobKey);
+            } catch (SchedulerException e) {
+                log.error("To attempt retries after Job with key {} failed, Job with key {} could not be scheduled.", jobKey, retriesJobKey, e);
+                telemetryEventLogger.cardExpiryDateRetriesJobFailedToBeScheduled(e);
+            }
+        }
+    }
+}
+
+
+package com.sample.quartz.listener;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.JobKey;
+import org.quartz.JobListener;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.springframework.beans.factory.annotation.Value;
+import com.sample.appinsights.TelemetryEventLogger;
+import com.sample.quartz.Constants;
+import com.sample.quartz.job.Group;
+import com.sample.quartz.job.Name;
+
+import static java.lang.String.format;
+
+@Slf4j
+@RequiredArgsConstructor
+public class CardExpiryDateRetriesJobListener implements JobListener {
+    private static final String NB_RETRIES = "nbRetries";
+
+    @Value("${quartz.cardExpiryDate.retry.maxNbRetries}")
+    private int maxNbRetries;
+
+    private final TelemetryEventLogger telemetryEventLogger;
+
+    @Override
+    public String getName() {
+        return format(Constants.LISTENER_NAME_PATTERN, Group.NOTIFICATION.name(), Name.CARD_EXPIRY_DATE_RETRIES.name());
+    }
+
+    @Override
+    public void jobToBeExecuted(JobExecutionContext jobExecutionContext) {
+        JobDetail jobDetail = jobExecutionContext.getJobDetail();
+        JobDataMap jobDataMap = jobDetail.getJobDataMap();
+        if (!jobDataMap.containsKey(NB_RETRIES)) {
+            jobDataMap.put(NB_RETRIES, 0);
+        }
+
+        int nbRetries = jobDataMap.getIntValue(NB_RETRIES);
+        nbRetries = nbRetries + 1;
+        jobDataMap.put(NB_RETRIES, nbRetries);
+        log.debug("nbTries is at {} for job with key {}", nbRetries, jobDetail.getKey());
+    }
+
+    @Override
+    public void jobExecutionVetoed(JobExecutionContext jobExecutionContext) {
+    }
+
+    @Override
+    public void jobWasExecuted(JobExecutionContext jobExecutionContext, JobExecutionException jobExecutionException) {
+        JobDetail jobDetail = jobExecutionContext.getJobDetail();
+        JobKey jobKey = jobDetail.getKey();
+
+        if (jobExecutionException != null) {
+            JobDataMap jobDataMap = jobDetail.getJobDataMap();
+            int nbRetries = jobDataMap.getIntValue(NB_RETRIES);
+            log.info("Job with key {} has run {} times and has failed each time.", jobKey, nbRetries);
+
+            if (nbRetries >= maxNbRetries) {
+                log.error("Job with key {} has run {} times and has failed each time. All retries have now been exhausted.", jobKey, nbRetries);
+                telemetryEventLogger.cardExpiryDateJobFailedAfterAllRetries(jobExecutionException.getUnderlyingException());
+
+                unSchedule(jobExecutionContext, jobKey);
+            }
+        } else {
+            unSchedule(jobExecutionContext, jobKey);
+        }
+    }
+
+    private void unSchedule(JobExecutionContext jobExecutionContext, JobKey jobKey) {
+        try {
+            Scheduler scheduler = jobExecutionContext.getScheduler();
+            scheduler.deleteJob(jobKey);
+        } catch (SchedulerException e) {
+            log.error("Failed to delete Job with key {}.", jobKey, e);
+        }
+    }
+}
+
+
+********************************************************************************
+
+
+To have the Quartz-related tables created correctly, add to the Liquibase
+changelog yaml file:
+
+- include:
+    file: classpath:org/quartz/impl/jdbcjobstore/liquibase.quartz.init.xml
