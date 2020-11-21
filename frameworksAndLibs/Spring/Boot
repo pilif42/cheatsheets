@@ -6,3 +6,9 @@
     - In IntelliJ:
           - Run config with VM options: -Dspring.profiles.active="local"
           - or Maven window with 'm' icon: mvn clean spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=local"
+
+
+- Micrometer:
+    - to add monitoring to your apps (how long does a HTTP request takes?, etc.)
+    - https://www.baeldung.com/micrometer
+    - https://spring.io/blog/2018/03/16/micrometer-spring-boot-2-s-new-application-metrics-collector

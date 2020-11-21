@@ -29,6 +29,12 @@ Right-click in your test file.
 In the Run Config which opens, for Jest package, select c:\Temp\code\myproj-apigee\node_modules\jest
 
 
+- To run an app locally:
+    - in GitBash:
+        - npm install
+        - npm run lite (This will open a browser tab and start the portal app.)
+
+
 - Sample .js file called IdentifyDataCategory.js:
 var zoomlevel = context.getVariable("myproj.request.z");
 var srs = context.getVariable("myproj.request.srs");

@@ -1,0 +1,537 @@
+The page (myPage.js): see how some items are displayed depending on the value of cardExpiryStatus.
+
+import React, {Fragment, useState} from 'react';
+import {useSelector} from 'react-redux';
+import SetupPaymentDialog from "../SetupPaymentDialog";
+import ClearPaymentDetailsDialog from "./ClearPaymentDetailsDialog";
+import {defineMessages, FormattedMessage} from 'react-intl';
+import Typography from '@material-ui/core/Typography';
+import Button from '@material-ui/core/Button';
+import makeStyles from '@material-ui/core/styles/makeStyles';
+import {linkButton, border1, osColour} from 'mysample-components';
+import classNames from 'classnames';
+import {fade} from '@material-ui/core/styles/colorManipulator';
+
+const borderRadusSpacing = 0.5;
+const styles = makeStyles(theme => ({
+    addButton: {
+        display: 'block',
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        marginTop: theme.spacing(3)
+    },
+    table: {
+        width: '100%',
+        marginTop: theme.spacing(3),
+        borderSpacing: 0,
+        '& th': {
+            textAlign: 'left',
+            padding: theme.spacing(1)
+        },
+        '& tbody': {
+        },
+        '& td': {
+            // this colour matches the menu on the left
+            backgroundColor: fade(osColour.primary.berry, theme.palette.action.hoverOpacity),
+            padding: theme.spacing(1),
+        },
+        '&.red td': {
+            backgroundColor: '#ec808c'
+        }
+    },
+    right: {
+        textAlign: 'right'
+    },
+    top: {
+        borderTop: border1
+    },
+    topLeft: {
+        borderTopLeftRadius: theme.spacing(borderRadusSpacing),
+        borderTop: border1,
+        borderLeft: border1
+    },
+    topRight: {
+        borderTopRightRadius: theme.spacing(borderRadusSpacing),
+        borderTop: border1,
+        borderRight: border1
+    },
+    bottomLeft: {
+        borderBottomLeftRadius: theme.spacing(borderRadusSpacing),
+        borderBottom: border1,
+        borderLeft: border1
+    },
+    bottomRight: {
+        borderBottomRightRadius: theme.spacing(borderRadusSpacing),
+        borderBottom: border1,
+        borderRight: border1
+    },
+    linkButton: {
+        ...linkButton,
+        marginRight: theme.spacing(0.5)
+    },
+    remove: {
+        marginTop: theme.spacing(2),
+        marginLeft: theme.spacing(2)
+    }
+}));
+
+const messages = defineMessages({
+    paymentDetails: {
+        id: 'PaymentDetails.paymentDetails',
+        defaultMessage: 'Payment card details',
+        description: 'Payment details message'
+    },
+    setupPayment: {
+        id: 'PaymentDetails.setupPayment',
+        defaultMessage: 'Add a new payment card',
+        description: 'Setup payment details message'
+    },
+    replace: {
+        id: 'PaymentDetails.replace',
+        defaultMessage: 'Replace',
+        description: 'Label for the Replace button'
+    },
+    remove: {
+        id: 'PaymentDetails.remove',
+        defaultMessage: 'Remove your payment card details',
+        description: 'Label for the Remove button'
+    },
+    removeHelp: {
+        id: 'PaymentDetails.removeHelp',
+        defaultMessage: '(your final balance will be settled)',
+        description: 'Help text for the Remove button'
+    },
+    cardNumber: {
+        id: 'PaymentDetails.cardNumber',
+        defaultMessage: 'Your payment card',
+        description: 'Label for the card number'
+    },
+    cardExpiry: {
+        id: 'PaymentDetails.cardExpiry',
+        defaultMessage: 'Expires',
+        description: 'Label for the expiry date'
+    },
+    cardDueToExpire: {
+        id: 'PaymentDetails.dueToExpire',
+        defaultMessage: 'Card due to expire soon',
+        description: 'Label for the dueToExpire'
+    },
+    cardExpired: {
+        id: 'PaymentDetails.cardExpired',
+        defaultMessage: 'Card expired',
+        description: 'Label for the cardExpired'
+    },
+    PASSED: {
+        id: 'PaymentDetails.PASSED',
+        defaultMessage: 'This card is verified and active',
+        description: 'Used when a payment card is active'
+    },
+    PENDING: {
+        id: 'PaymentDetails.PENDING',
+        defaultMessage: 'This card is in the process of being verified',
+        description: 'Used when a payment card is pending verification'
+    },
+    FAILED: {
+        id: 'PaymentDetails.FAILED',
+        defaultMessage: 'This card was not verified - payment cannot be taken from it. Please replace it with another.',
+        description: 'Used when a payment card is pending verification'
+    },
+    deleteRequested: {
+        id: 'PaymentDetails.deleteRequested',
+        defaultMessage: 'Scheduled for deletion',
+        description: 'Used when a payment card is scheduled for deletion'
+    }
+});
+
+function cardDetailsExpiryStatus(cardDetails) {
+    const reply = {};
+    reply.isCardDueToExpire = false;
+    reply.isCardExpired = false;
+
+    if (cardDetails && cardDetails.status === 'PASSED') {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const cardYear = cardDetails.cardExpiryDate.year;
+        const cardMonth = cardDetails.cardExpiryDate.month;
+
+        if (cardYear < year || (cardYear === year && cardMonth < month)) {
+            reply.isCardExpired = true;
+            return reply;
+        }
+
+        // current month is the expiry month or the one before expiry month
+        if ((year === cardYear && ((month === cardMonth) || (month === (cardMonth - 1)))) ||
+            (year === (cardYear - 1) && (cardMonth === 1) && (month === 12))) {
+            reply.isCardDueToExpire = true;
+        }
+    }
+
+    return reply;
+}
+
+export default function PaymentDetails() {
+    const [settingUp, setSettingUp] = useState(false);
+    const [clearing, setClearing] = useState(false);
+    const {loading, result} = useSelector(state => state.payments.status);
+    const cardDetails = result && result.cardDetails;
+
+    const classes = styles();
+
+    const cardExpiryStatus = cardDetailsExpiryStatus(cardDetails);
+
+    let content;
+
+    if(loading && !cardDetails) {
+        // We don't have any details to display, but we might have very soon. We may need the dialogs to still
+        // be drawn, so we render those plus some null content.
+        content = null;
+    } else if(!cardDetails) {
+        content = <Button color='primary'
+                          variant='contained'
+                          className={classes.addButton}
+                          onClick={() => setSettingUp(true)}>
+            <FormattedMessage {...messages.setupPayment} />
+        </Button>;
+    } else {
+        content = <Fragment>
+            <table className={classNames(classes.table, {red: cardDetails.status === "FAILED" || cardDetails.deleteRequested})}>
+                <thead>
+                <tr>
+                    <th>
+                        <Typography variant='body2'>
+                            <FormattedMessage {...messages.cardNumber}/>
+                        </Typography>
+                    </th>
+                    <th>
+                        <Typography variant='body2'>
+                            <FormattedMessage {...messages.cardExpiry}/>
+                        </Typography>
+                    </th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td className={classes.topLeft}>
+                        <Typography variant='body1'>
+                            {cardDetails.cardNumber}
+                        </Typography>
+                    </td>
+                    <td className={classes.top}>
+                        <Typography variant='body1'>
+                            {cardDetails.cardExpiryDate.month}
+                            /
+                            {cardDetails.cardExpiryDate.year}
+                        </Typography>
+                    </td>
+                    <td className={classNames(classes.right, classes.topRight)}>
+                        <Button color='primary'
+                                variant='contained'
+                                onClick={() => setSettingUp(true)}>
+                            <FormattedMessage {...messages.replace} />
+                        </Button>
+                    </td>
+                </tr>
+                <tr>
+                    <td colSpan={3} className={classNames(classes.bottomLeft, classes.bottomRight)}>
+                        {
+                            messages[cardDetails.status] &&
+                            !(cardDetails.status === "PASSED" && cardDetails.deleteRequested) &&
+                            <Typography variant='body1'>
+                                <FormattedMessage {...messages[cardDetails.status]}/>
+                            </Typography>
+                        }
+                        {
+                            cardDetails.deleteRequested &&
+                            <Typography variant='body1'>
+                                <FormattedMessage {...messages.deleteRequested}/>
+                            </Typography>
+                        }
+                        {
+                            cardExpiryStatus.isCardDueToExpire &&
+                            <Typography variant='body1'>
+                                <FormattedMessage {...messages.cardDueToExpire}/>
+                            </Typography>
+                        }
+                        {
+                            cardExpiryStatus.isCardExpired &&
+                            <Typography variant='body1'>
+                                <FormattedMessage {...messages.cardExpired}/>
+                            </Typography>
+                        }
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            {!cardDetails.deleteRequested &&
+                <div className={classes.remove}>
+                    <Button component='span'
+                    className={classes.linkButton}
+                    onClick={() => setClearing(true)}>
+                    <FormattedMessage {...messages.remove} />
+                    </Button>
+                    <Typography component='span' variant='body1'>
+                    <FormattedMessage {...messages.removeHelp}/>
+                    </Typography>
+                </div>
+            }
+        </Fragment>
+    }
+
+    return <div>
+        { content }
+        {
+            settingUp && <SetupPaymentDialog onClose={() => setSettingUp(false)}/>
+        }
+        {
+            clearing && <ClearPaymentDetailsDialog onClose={() => setClearing(false)}/>
+        }
+    </div>;
+}
+
+
+********************************************************************************
+
+
+- The tests (myPage.test.js):
+For the equivalent of a parameterized test, see: it.each([
+    [0, 1],
+    [0, 0],
+]
+See dateYearSpy & dateMonthSpy to mock the behaviour of a JavaScript method (getFullYear() & getMonth()).
+
+
+import React from 'react';
+import {mount} from 'enzyme';
+import {Provider} from 'react-redux';
+import {FormattedMessage, IntlProvider} from 'react-intl';
+import mockStore from 'redux-mock-store'
+import PaymentDetails from "./PaymentDetails";
+import SetupPaymentDialog from "../SetupPaymentDialog";
+import ClearPaymentDetailsDialog from "./ClearPaymentDetailsDialog";
+import Button from '@material-ui/core/Button';
+import { act } from 'react-dom/test-utils';
+import {MuiThemeProvider, createMuiTheme} from '@material-ui/core';
+
+jest.mock('../SetupPaymentDialog', () => props => <div/>);
+jest.mock('./ClearPaymentDetailsDialog', () => props => <div/>);
+
+const theme = createMuiTheme();
+
+let store, dateYearSpy, dateMonthSpy;
+
+function setup(cardDetails, loading = false) {
+    store = mockStore([])({
+        payments: {
+            status: {
+                loading,
+                result: {
+                    cardDetails,
+                }
+            }
+        }
+    });
+
+    return mount(<Provider store={store}>
+        <MuiThemeProvider theme={theme}>
+            <IntlProvider locale='en'>
+                <PaymentDetails/>
+            </IntlProvider>
+        </MuiThemeProvider>
+    </Provider>);
+}
+
+afterEach(function () {
+    if (dateYearSpy) {
+        dateYearSpy.mockRestore();
+    }
+    if (dateMonthSpy) {
+        dateMonthSpy.mockRestore();
+    }
+});
+
+it('Should allow the user to setup new details', function() {
+    const wrapper = setup(null);
+
+    const buttons = wrapper.find(Button);
+    expect(buttons).toHaveLength(1);
+
+    expect(buttons.text()).toEqual('Add a new payment card');
+
+    expect(wrapper.find(SetupPaymentDialog)).toHaveLength(0);
+    buttons.simulate('click');
+    const dialogs = wrapper.find(SetupPaymentDialog);
+    expect(dialogs).toHaveLength(1);
+    act(() => dialogs.prop('onClose')());
+    wrapper.update();
+    expect(wrapper.find(SetupPaymentDialog)).toHaveLength(0);
+});
+
+it('Should allow the user to change existing details', function() {
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: 8,
+            year: 2019
+        }
+    });
+
+    const buttons = wrapper.find(Button);
+    expect(buttons).toHaveLength(2);
+
+    expect(buttons.first().text()).toEqual('Replace');
+
+    expect(wrapper.find(SetupPaymentDialog)).toHaveLength(0);
+    buttons.first().simulate('click');
+    const dialogs = wrapper.find(SetupPaymentDialog);
+    expect(dialogs).toHaveLength(1);
+    act(() => dialogs.prop('onClose')());
+    wrapper.update();
+    expect(wrapper.find(SetupPaymentDialog)).toHaveLength(0);
+});
+
+it('Should allow the user to clear existing details', function() {
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: 8,
+            year: 2019
+        }
+    });
+
+    const buttons = wrapper.find(Button);
+    expect(buttons).toHaveLength(2);
+
+    expect(buttons.last().text()).toEqual('Remove your payment card details');
+
+    expect(wrapper.find(ClearPaymentDetailsDialog)).toHaveLength(0);
+    buttons.last().simulate('click');
+    const dialogs = wrapper.find(ClearPaymentDetailsDialog);
+    expect(dialogs).toHaveLength(1);
+    act(() => dialogs.prop('onClose')());
+    wrapper.update();
+    expect(wrapper.find(ClearPaymentDetailsDialog)).toHaveLength(0);
+});
+
+it('Should respect the delete requested flag', function() {
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: 8,
+            year: 2050
+        },
+        deleteRequested: true,
+        status: "PASSED"
+    });
+    const buttons = wrapper.find(Button);
+    expect(buttons).toHaveLength(1);
+
+    expect(buttons.last().text()).toEqual('Replace');
+
+    let messageList = wrapper.find(FormattedMessage);
+    expect(messageList.last().prop("defaultMessage")).toEqual("Scheduled for deletion");
+    messageList.forEach((message) => {
+        expect(message.prop("defaultMessage")).not.toEqual("This card is verified and active");
+    });
+});
+
+it('Should render nothing when the details are loading', function() {
+    const wrapper = setup(null, true);
+    expect(wrapper.find(Button)).toHaveLength(0);
+});
+
+it('Should respect the cardExpired flag for a PASSED card', function() {
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: 8,
+            year: 2019
+        },
+        deleteRequested: true,
+        status: "PASSED"
+    });
+
+    let messageList = wrapper.find(FormattedMessage);
+    expect(messageList.last().prop("defaultMessage")).toEqual("Card expired");
+});
+
+it('Should not respect the cardExpired flag for a non-PASSED card', function() {
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: 8,
+            year: 2019
+        },
+        deleteRequested: true,
+        status: "PENDING"
+    });
+
+    let messageList = wrapper.find(FormattedMessage);
+    messageList.forEach((message) => {
+        expect(message.prop("defaultMessage")).not.toEqual("Card expired");
+    })
+});
+
+it.each([
+    [0, 1],
+    [0, 0],
+])('Should respect the dueToExpire flag for a PASSED card', function(diffWithCurrentYear, diffWithCurrentMonth) {
+    let date = new Date();
+    let year = date.getFullYear() + diffWithCurrentYear;
+    let month = date.getMonth() + 1 + diffWithCurrentMonth;
+
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: month,
+            year: year
+        },
+        deleteRequested: true,
+        status: "PASSED"
+    });
+
+    let messageList = wrapper.find(FormattedMessage);
+    expect(messageList.last().prop("defaultMessage")).toEqual("Card due to expire soon");
+});
+
+it('Should respect the dueToExpire flag for a PASSED card. Edge case where the card will expire in first month of next year, when in last month of year', function() {
+    dateYearSpy = jest.spyOn(Date.prototype, 'getFullYear').mockReturnValue(2020);
+    dateMonthSpy = jest.spyOn(Date.prototype, 'getMonth').mockReturnValue(12 - 1); // dec, getMonth uses 0 start index
+
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: 1,
+            year: 2021
+        },
+        deleteRequested: true,
+        status: "PASSED"
+    });
+
+    let messageList = wrapper.find(FormattedMessage);
+    expect(messageList.last().prop("defaultMessage")).toEqual("Card due to expire soon");
+});
+
+it.each([
+    [0, 1],
+    [0, 0],
+])('Should not respect the dueToExpire flag for a non-PASSED card', function(diffWithCurrentYear, diffWithCurrentMonth) {
+    let date = new Date();
+    let year = date.getFullYear() + diffWithCurrentYear;
+    let month = date.getMonth() + 1 + diffWithCurrentMonth;
+
+    const wrapper = setup({
+        cardNumber: '1234************',
+        cardExpiryDate: {
+            month: month,
+            year: year
+        },
+        deleteRequested: true,
+        status: "PENDING"
+    });
+
+    let messageList = wrapper.find(FormattedMessage);
+    messageList.forEach((message) => {
+        expect(message.prop("defaultMessage")).not.toEqual("Card due to expire soon");
+    })
+});
