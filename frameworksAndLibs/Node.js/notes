@@ -35,6 +35,16 @@ In the Run Config which opens, for Jest package, select c:\Temp\code\myproj-apig
         - npm run lite (This will open a browser tab and start the portal app.)
 
 
+- To work efficiently when your app (portal) uses components from another project (common-components):
+    - this will enable you to change the common-components code and see the effect in the portal without restarting.
+    - in GitBash, in the common-components root directory:
+          - npm link
+          - npm run build:watch
+    - in the portal root directory:
+          - npm link common-components
+          - npm run lite
+
+
 - Sample .js file called IdentifyDataCategory.js:
 var zoomlevel = context.getVariable("myproj.request.z");
 var srs = context.getVariable("myproj.request.srs");
