@@ -1,0 +1,51 @@
+In payments.js:
+if (!req.user.organisation.erpAccount.id) {
+    try {
+        await setERPAccount(req.user.organisation.id, newBillingAddress, newPhoneNumber);
+    } catch(err) {
+        // The ERP account setup failed, but there is little point asking the user to retry, so we should continue
+        log.error({err, orgId}, "Failed to set ERP account after taking payment details");
+    }
+}
+
+
+
+In payments.test.js, you want to test that the log statement appears when
+setERPAccount fails. To achieve this, you need:
+
+At the start of the test file:
+const mockLog = require('../../util/logging').createLogger('bogus');
+
+jest.mock('../../util/logging', () => {
+    let mockLog = {
+        warn: jest.fn(),
+        error: jest.fn()
+    };
+
+    return {
+        createLogger: () => mockLog
+    };
+});
+
+
+beforeEach(() => {
+    mockLog.warn.mockReset();
+    mockLog.error.mockReset();
+});
+
+
+it('Should ignore errors setting up the ERP account', function () {
+    setERPAccount.mockImplementationOnce(() => Promise.reject('testError'));
+    requestAsService.mockImplementationOnce(() => Promise.resolve({}));
+
+    app.use(setup());
+
+    return request(app)
+        .post('/setup')
+        .send({session: 'testSession'})
+        .expect(200, 'mock status')
+        .then(() => {
+            expect(mockLog.error).toHaveBeenCalledWith({ err: 'testError', orgId: mockUser.organisation.id }, "Failed to set ERP account after taking payment details");
+        });
+});
+ 

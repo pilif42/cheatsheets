@@ -1,0 +1,578 @@
+OrgDetailsForm.js: note that it is a cutdown version. See '...' in places.
+Search for RadioGroup for the radio button.
+
+import React, {useState} from 'react';
+import PropTypes from 'prop-types';
+import {useSelector} from 'react-redux';
+import {AddButton, InputBox, contentPadding, LabelledRadioButton} from "mySamples-components";
+import {defineMessages, FormattedMessage} from 'react-intl';
+import Typography from "@material-ui/core/Typography";
+import NavButton from "./NavButton";
+import ClickAwayTooltip from "./ClickAwayTooltip";
+import routePaths from "../util/routes";
+import makeStyles from '@material-ui/core/styles/makeStyles';
+import userConstants from "../constants/user"
+import infoIcon from "./icons/info-notification.svg";
+import {RadioGroup} from "@material-ui/core";
+
+const messages = defineMessages({
+    orgName: {
+        id: 'OrgDetailsForm.orgName',
+        defaultMessage: 'Organisation name / Company trading name *',
+        description: 'Title for the org name input'
+    },
+    ...
+});
+
+const styles = makeStyles(theme => ({
+    buttons: {
+        marginTop: theme.spacing(4),
+        marginBottom: theme.spacing(2),
+        display: 'flex',
+        justifyContent: 'flex-end',
+        '& button:first-of-type': {
+            marginRight: theme.spacing(2)
+        }
+    },
+    orgNameInfo:{
+        maxWidth:'370px',
+        height: 'auto',
+        position: 'relative',
+        margin: 'auto',
+        marginTop: theme.spacing(1)
+    },
+    infoIcon:{
+        width:'40px',
+        display: 'table-cell',
+        position: 'relative',
+        [theme.breakpoints.down('xs')]:{
+            paddingLeft: '15px'
+        }
+    },
+    infoTextWrapper:{
+        width: 'calc(100% - 40px)',
+        display: 'table-cell',
+        position: 'relative',
+        verticalAlign: 'top'
+    },
+    content: {
+        flex: '1 0 auto',
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        [theme.breakpoints.down('xs')]: {
+            padding: contentPadding.mobile
+        }
+    }
+}));
+
+export default function OrgDetailsForm({onSubmit, submitLabel, cancelLabel, working, showInfo}) {
+    let userDetails = useSelector(state => state.user.current.result);
+
+    const [modified, setModified] = useState(false);
+    const [orgName, setOrgName] = useState(userDetails.org || '');
+    const [jobTitle, setJobTitle] = useState(userDetails.jobTitle || '');
+    const [phone, setPhone] = useState(userDetails.telephoneNumber || '');
+    const alreadyInAnOrg = userDetails.org ? true : false;
+    const [accountType, setAccountType] = useState(userDetails.org? 'org' : 'individual');
+    const classes = styles();
+
+    function upgrade() {
+        onSubmit(accountType, orgName, jobTitle, phone);
+    }
+    function handleInput(setter) {
+        return e => {
+            setModified(true);
+            setter(e.target.value);
+        }
+    }
+
+    let orgError = null;
+    let titleError = null;
+    let phoneError = null;
+    // Once any field has been modified then all of the fields are fair game for validation
+    if(modified) {
+        // Unmodified org names should not trigger an error, as if we have an invalid org name stored then the
+        // user has no choice other than to live with it.
+        if(!userDetails.org && accountType === 'org') {
+            if(orgName.length === 0) {
+                orgError = messages.orgMissing;
+            } else {
+                if(orgName.length > 100) {
+                    orgError = messages.orgNameLength;
+                } else if(!userConstants.nameMatcher.test(orgName)) {
+                    orgError = messages.orgNameValidation;
+                }
+            }
+        }
+
+        // Empty and unmodified job titles should not trigger an error. If we have an invalid title stored
+        // then we'll live with it until the user starts editing that field.
+        if(jobTitle !== '' && jobTitle !== userDetails.jobTitle) {
+            if(jobTitle.length > 100) {
+                titleError = userConstants.messages.jobTitleLengthError;
+            } else if(!userConstants.nameMatcher.test(jobTitle)) {
+                titleError = userConstants.messages.jobTitleValidationError;
+            }
+        }
+
+        // Empty and unmodified phone numbers should not trigger an error. If we have an invalid number stored
+        // then we'll live with it until the user starts editing that field.
+        if(phone !== '' && phone !== userDetails.telephoneNumber) {
+            if(phone.length > 30) {
+                phoneError = userConstants.messages.phoneLengthError;
+            } else if(!userConstants.phoneMatcher.test(phone)) {
+                phoneError = userConstants.messages.phoneValidationError;
+            }
+        }
+    }
+
+    const ready = ((accountType === 'org' && orgName.length > 0 && !orgError) ||  (accountType === 'individual')) && !titleError && !phoneError;
+
+    return <div className={classes.content}>
+        {
+            !alreadyInAnOrg &&
+            <RadioGroup name='accountType'
+                        value={accountType}
+                        onChange={handleInput(setAccountType)}>
+                <LabelledRadioButton selectedOption={accountType}
+                                     option={'org'}
+                                     label={messages.org}/>
+                <LabelledRadioButton selectedOption={accountType}
+                                     option={'individual'}
+                                     label={messages.individual}/>
+            </RadioGroup>
+        }
+
+        <InputBox id='OrgName'
+                  label={messages.orgName}
+                  error={orgError}
+                  value={orgName}
+                  fullWidth={true}
+                  disabled={alreadyInAnOrg || (accountType === 'individual')} // If there is an existing org name then we are not allowed to change it.
+                  onChange={handleInput(setOrgName)}/>
+
+        {
+            showInfo &&
+            <div className={classes.orgNameInfo}>
+                <div className={classes.infoIcon}>
+                    <img src={infoIcon} alt='information icon'/>
+                </div>
+                <div className={classes.infoTextWrapper}>
+                    <Typography variant='body1' component="div">
+                        <ClickAwayTooltip body={messages.tooltipInfo} label={messages.orgNameInfo} toolTipValue='What does this mean?'/>
+                    </Typography>
+                </div>
+            </div>
+        }
+
+        <InputBox id='JobTitle'
+                  label={messages.jobTitle}
+                  error={titleError}
+                  value={jobTitle}
+                  fullWidth={true}
+                  onChange={handleInput(setJobTitle)}/>
+
+        <InputBox id='Phone'
+                  label={messages.phone}
+                  error={phoneError}
+                  value={phone}
+                  fullWidth={true}
+                  onChange={handleInput(setPhone)}/>
+
+        <div className={classes.buttons}>
+            <NavButton path={routePaths.dashboard}
+                    variant='outlined'
+                    color='primary'>
+                <FormattedMessage {...cancelLabel}/>
+            </NavButton>
+            <AddButton action={upgrade}
+                       label={submitLabel}
+                       working={working}
+                       disabled={!ready}
+                       showIcon={false}
+            />
+        </div>
+    </div>;
+}
+
+OrgDetailsForm.propTypes = {
+    onSubmit: PropTypes.func.isRequired,      // Function to be called with accountType, orgName, jobTitle, phoneNumber
+    cancelLabel: PropTypes.object.isRequired, // Label for the cancel button
+    submitLabel: PropTypes.object.isRequired, // Label for the submit button
+    working: PropTypes.bool,                  // Should be true while the submit function is working
+    showInfo: PropTypes.bool.isRequired       // Show or hide the info messages about organisations and admins
+};
+
+OrgDetailsForm.defaultProps = {
+    showInfo: true
+};
+
+
+********************************************************************************
+
+
+And its test OrgDetailsForm.test.js
+
+import React from 'react';
+import {mount} from 'enzyme';
+import {Provider} from 'react-redux';
+import {IntlProvider} from 'react-intl';
+import mockStore from 'redux-mock-store';
+import OrgDetailsForm from "./OrgDetailsForm";
+import {Router} from 'react-router'
+import {AddButton, InputBox} from "mySamples-components";
+import {act} from 'react-dom/test-utils';
+import NavButton from "./NavButton";
+import {RadioGroup} from "@material-ui/core";
+
+const cancelMessage = {
+    id: 'test.CANCEL',
+    defaultMessage: 'xxCANCELxx'
+};
+const submitMessage = {
+    id: 'test.SUBMIT',
+    defaultMessage: 'xxSUBMITxx'
+};
+
+let currentUser;
+let state;
+let mockHistory;
+let store;
+let submit;
+
+function setup(props) {
+    submit = jest.fn();
+    store = mockStore([])(state);
+    const wrapper = mount(<Provider store={store}>
+        <Router history={mockHistory}>
+            <IntlProvider locale='en'>
+                <OrgDetailsForm cancelLabel={cancelMessage} submitLabel={submitMessage} onSubmit={submit} {...props}/>
+            </IntlProvider>
+        </Router>
+    </Provider>);
+    return wrapper;
+}
+
+beforeEach(function() {
+    currentUser = {
+        loading: false,
+        result: {}
+    };
+    state = {
+        user: {
+            current: currentUser
+        }
+    }
+    mockHistory = {
+        replace: jest.fn(),
+        listen: jest.fn(),
+        createHref: jest.fn(),
+        location: {}
+    };
+});
+
+it('Should display a working button when the page is working', function() {
+
+    let wrapper = setup({ working: true });
+
+    const button = wrapper.find(AddButton);
+    expect(button.prop('working')).toBe(true);
+});
+
+it('Should return to the dashboard if the user cancels', function() {
+    const wrapper = setup();
+
+    const button = wrapper.find(NavButton);
+    expect(button.text()).toBe('xxCANCELxx');
+    expect(button.prop('path')).toBe('/dashboard');
+});
+
+it('Should allow a user, not part of an organisation, to upgrade as an individual (default option) providing job title, and number', function() {
+    // GIVEN
+    const wrapper = setup();
+
+    let inputs = wrapper.find(InputBox);
+    act(() => {
+        inputs.at(1).prop('onChange')({ target: { value: 'MyTitle' }});
+        inputs.at(2).prop('onChange')({ target: { value: '123' }});
+    });
+
+   wrapper.update();
+
+    const button = wrapper.find(AddButton);
+    expect(button.prop('working')).toBe(undefined);
+    expect(button.prop('disabled')).toBe(false);
+    expect(button.text()).toBe('xxSUBMITxx');
+
+    // WHEN
+    button.simulate('click');
+
+    // THEN
+    expect(submit).toHaveBeenCalledWith('individual', '', 'MyTitle', '123');
+    expect(store.getActions()).toEqual([]);
+});
+
+it('Should allow a user, not part of an organisation, to upgrade as an organisation providing org name, job title, and number', function() {
+    // GIVEN
+    const wrapper = setup();
+
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'org' }});
+    });
+
+    let inputs = wrapper.find(InputBox);
+    act(() => {
+        inputs.at(0).prop('onChange')({ target: { value: 'MyOrg' }});
+        inputs.at(1).prop('onChange')({ target: { value: 'MyTitle' }});
+        inputs.at(2).prop('onChange')({ target: { value: '123' }});
+    });
+
+    wrapper.update();
+
+    const button = wrapper.find(AddButton);
+    expect(button.prop('working')).toBe(undefined);
+    expect(button.prop('disabled')).toBe(false);
+    expect(button.text()).toBe('xxSUBMITxx');
+
+    // WHEN
+    button.simulate('click');
+
+   // THEN
+    expect(submit).toHaveBeenCalledWith('org', 'MyOrg', 'MyTitle', '123');
+    expect(store.getActions()).toEqual([]);
+});
+
+it('Should not display an error if the org name is empty when option \'I am an individual\' is selected', function() {
+    const wrapper = setup();
+
+    let orgInput = wrapper.find(InputBox).first();
+    expect(orgInput.prop('disabled')).toBe(true);
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(false);
+
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'org' }});
+    });
+    wrapper.update();
+
+    // Fill in a value
+    act(() => {
+        orgInput.prop('onChange')({target: {value: 'abc'}});
+    });
+    wrapper.update();
+    orgInput = wrapper.find(InputBox).first();
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(false);
+
+    // Clear the value
+    act(() => {
+        orgInput.prop('onChange')({target: {value: ''}});
+    });
+
+    // Select the 'I am an individual' radio button
+    radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'individual' }});
+    });
+    wrapper.update();
+
+    orgInput = wrapper.find(InputBox).first();
+    expect(orgInput.prop('disabled')).toBe(true);
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(false);
+});
+
+it('Should display an error if the org name is empty when option \'I am an organisation\' is selected', function() {
+    // Initially no error, as the user has not interacted with the page yet
+    const wrapper = setup();
+
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'org' }});
+    });
+    wrapper.update();
+
+    let orgInput = wrapper.find(InputBox).first();
+    expect(orgInput.prop('error').defaultMessage).toContain('Please enter an organisation name.');
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+
+    // Fill in a value
+    act(() => {
+        orgInput.prop('onChange')({target: {value: 'abc'}});
+    });
+    wrapper.update();
+    orgInput = wrapper.find(InputBox).first();
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(false);
+
+    // Clear the value
+    act(() => {
+        orgInput.prop('onChange')({target: {value: ''}});
+    });
+    wrapper.update();
+    orgInput = wrapper.find(InputBox).first();
+    expect(orgInput.prop('error')).toBeTruthy();
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+});
+
+it('Should display an error if the other fields are edited when option \'I am an organisation\' is selected', function() {
+    // Initially no error, as the user has not interacted with the page yet
+    const wrapper = setup();
+
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'org' }});
+    });
+    wrapper.update();
+
+    let phoneInput = wrapper.find(InputBox).last();
+
+    // Fill in a value for the phone number
+    act(() => {
+        phoneInput.prop('onChange')({ target: { value: '123' }});
+    });
+    wrapper.update();
+
+    const orgInput = wrapper.find(InputBox).first();
+    expect(orgInput.prop('error')).toBeTruthy();
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+});
+
+it('Should not flag an error if the stored values do not meet our rules', function() {
+    currentUser.result.org = '`';
+    currentUser.result.jobTitle = '`'
+    currentUser.result.telephoneNumber = '`';
+
+    const wrapper = setup();
+    const inputs = wrapper.find(InputBox);
+    inputs.forEach(input => expect(input.prop('error')).toBeNull());
+
+    // modify something, just to set the component as edited
+    act(() => {
+        inputs.last().prop('onChange')({ target: {value: '`'}});
+    });
+    wrapper.update();
+
+    inputs.forEach(input => expect(input.prop('error')).toBeNull());
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(false);
+});
+
+it('Should allow the correct characters', function() {
+    let org = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.#$% ';
+    let jobTitle = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.#$% '
+    let telephoneNumber = '0123456789-+() ';
+
+    const wrapper = setup();
+    const inputs = wrapper.find(InputBox);
+    inputs.forEach(input => expect(input.prop('error')).toBeNull());
+
+    act(() => {
+        inputs.at(0).prop('onChange')({ target: {value: org}});
+        inputs.at(1).prop('onChange')({ target: {value: jobTitle}});
+        inputs.at(2).prop('onChange')({ target: {value: telephoneNumber}});
+    });
+    wrapper.update();
+
+    inputs.forEach(input => expect(input.prop('error')).toBeNull());
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(false);
+});
+
+it('Should set initial values for the fields', function() {
+    currentUser.result.org = 'test org';
+    currentUser.result.jobTitle = 'job'
+    currentUser.result.telephoneNumber = '123';
+
+    const wrapper = setup();
+
+    const inputs = wrapper.find(InputBox);
+    expect(inputs.at(0).prop('value')).toBe('test org');
+    expect(inputs.at(0).prop('disabled')).toBe(true); // No editing for an existing org name
+    expect(inputs.at(1).prop('value')).toBe('job');
+    expect(inputs.at(1).prop('onChange')).toBeDefined();
+   expect(inputs.at(2).prop('value')).toBe('123');
+    expect(inputs.at(2).prop('onChange')).toBeDefined();
+
+    // Radio buttons will not be shown when I am part of an org.
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    expect(radioButtonGroup.length === 0).toBeTruthy();
+});
+
+it('Should limit the length of the fields (job title, phone number) when option \'I am an individual\' is selected', function() {
+    const wrapper = setup();
+    let inputs = wrapper.find(InputBox);
+    act(() => {
+        inputs.at(0).prop('onChange')({ target: { value: 'a'.repeat(101) }});
+        inputs.at(1).prop('onChange')({ target: { value: 'a'.repeat(101) }});
+        inputs.at(2).prop('onChange')({ target: { value: 'a'.repeat(31) }});
+    });
+    wrapper.update();
+    inputs = wrapper.find(InputBox);
+    expect(inputs.at(0).prop('error')).toBeNull();
+    expect(inputs.at(1).prop('error').defaultMessage).toContain('at most 100 characters long');
+    expect(inputs.at(2).prop('error').defaultMessage).toContain('at most 30 characters long');
+
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+});
+
+it('Should limit the length of the fields (orgName, job title, phone number) when option \'I am an organisation\' is selected', function() {
+    const wrapper = setup();
+
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'org' }});
+    });
+
+    let inputs = wrapper.find(InputBox);
+    act(() => {
+        inputs.at(0).prop('onChange')({ target: { value: 'a'.repeat(101) }});
+        inputs.at(1).prop('onChange')({ target: { value: 'a'.repeat(101) }});
+        inputs.at(2).prop('onChange')({ target: { value: 'a'.repeat(31) }});
+    });
+    wrapper.update();
+
+    inputs = wrapper.find(InputBox);
+    expect(inputs.at(0).prop('error').defaultMessage).toContain('at most 100 characters long');
+    expect(inputs.at(1).prop('error').defaultMessage).toContain('at most 100 characters long');
+    expect(inputs.at(2).prop('error').defaultMessage).toContain('at most 30 characters long');
+
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+});
+
+it('Should limit the content of the fields (job title, phone number) when option \'I am an individual\' is selected', function() {
+    let badString = '`';
+
+    const wrapper = setup();
+    let inputs = wrapper.find(InputBox);
+    act(() => {
+        inputs.forEach(input => input.prop('onChange')({ target: { value: badString }}));
+    });
+    wrapper.update();
+    inputs = wrapper.find(InputBox);
+    expect(inputs.at(0).prop('error')).toBeNull();
+    expect(inputs.at(1).prop('error').defaultMessage).toContain('letters, numbers and these special characters ._#-$%');
+    expect(inputs.at(2).prop('error').defaultMessage).toContain('numbers and these special characters +-()');
+
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+});
+
+it('Should limit the content of the fields (orgName, job title, phone number) when option \'I am an organisation\' is selected', function() {
+    let badString = '`';
+
+    const wrapper = setup();
+
+    let radioButtonGroup = wrapper.find(RadioGroup);
+    act(() => {
+        radioButtonGroup.prop('onChange')({ target: { value: 'org' }});
+    });
+    wrapper.update();
+
+    let inputs = wrapper.find(InputBox);
+    act(() => {
+        inputs.forEach(input => input.prop('onChange')({ target: { value: badString }}));
+    });
+    wrapper.update();
+    inputs = wrapper.find(InputBox);
+    expect(inputs.at(0).prop('error').defaultMessage).toContain('letters, numbers and these special characters ._#-$%');
+    expect(inputs.at(1).prop('error').defaultMessage).toContain('letters, numbers and these special characters ._#-$%');
+    expect(inputs.at(2).prop('error').defaultMessage).toContain('numbers and these special characters +-()');
+
+    expect(wrapper.find(AddButton).prop('disabled')).toBe(true);
+});
