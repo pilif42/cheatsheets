@@ -1,0 +1,110 @@
+- Using tutorial https://docs.microsoft.com/en-us/azure/developer/java/toolkit-for-intellij/quickstart-functions ,
+it was straightforward to come up with a Function skeleton. I chose an HttpTrigger as the EventGrid trigger was not available in my IntelliJ.
+
+
+- Using https://docs.microsoft.com/en-us/azure/event-grid/receive-events,
+I adapted the skeleton so it works as an Event Grid endpoint (need to
+handle SubscriptionValidationEventData events, etc.). I also added a GET
+call (using java.net.URL & java.net.HttpURLConnection) to www.bbc.co.uk to
+ verify this can be done in an Azure Function.
+
+
+- To deploy it, I had to use a 2-stage approach:
+    - I went in the portal UI:
+        - select a resource group
+        - create a placeholder for Azure Function with name app-azure-function-poc.azurewebsites.net:
+            - I had to choose Linux for the running server.
+            - I gave it the AppInsights already present in the RG.
+            - I went for a Linux Consumption plan. (I also tried with a Linux Premium plan but this did not work: error msg on screen before being able to create it. See support levels for various plans at https://docs.microsoft.com/en-us/azure/azure-functions/functions-deployment-slots#support-levels)
+    - I then deployed the Function from IntelliJ following instructions at https://docs.microsoft.com/en-us/azure/developer/java/toolkit-for-intellij/quickstart-functions.
+
+
+- The function code is below:
+
+package com.example.functions;
+
+import com.microsoft.azure.eventgrid.customization.EventGridSubscriber;
+import com.microsoft.azure.eventgrid.models.EventGridEvent;
+import com.microsoft.azure.eventgrid.models.SubscriptionValidationEventData;
+import com.microsoft.azure.eventgrid.models.SubscriptionValidationResponse;
+import com.microsoft.azure.functions.ExecutionContext;
+import com.microsoft.azure.functions.HttpMethod;
+import com.microsoft.azure.functions.HttpRequestMessage;
+import com.microsoft.azure.functions.HttpResponseMessage;
+import com.microsoft.azure.functions.HttpStatus;
+import com.microsoft.azure.functions.annotation.AuthorizationLevel;
+import com.microsoft.azure.functions.annotation.FunctionName;
+import com.microsoft.azure.functions.annotation.HttpTrigger;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Optional;
+import java.util.logging.Logger;
+
+/**
+* Azure Functions with HTTP Trigger.
+*/
+public class HttpTriggerFunction {
+    /**
+     * TODO Limit the number of return
+     */
+    @FunctionName("HttpExample")
+    public HttpResponseMessage run(
+            @HttpTrigger(
+                    name = "pocForDynamicsEventGrid",
+                    methods = {HttpMethod.GET, HttpMethod.POST},
+                    authLevel = AuthorizationLevel.ANONYMOUS)
+                    HttpRequestMessage<Optional<String>> request,
+            final ExecutionContext context) {
+        final Logger logger = context.getLogger();
+        logger.info("Entering function pocForDynamicsEventGrid");
+
+        Optional<String> requestContentOpt = request.getBody();
+        if (requestContentOpt.isPresent()) {
+            String requestContent = requestContentOpt.get();
+            logger.info("Request body is: " + requestContent);
+
+            EventGridSubscriber eventGridSubscriber = new EventGridSubscriber();
+            try {
+                EventGridEvent[] eventGridEvents = eventGridSubscriber.deserializeEventGridEvents(requestContent);
+                // TODO By default, eventGridEvents is of size 1 so this could be simplified.
+                for (int i = 0; i < eventGridEvents.length; i++) {
+                    EventGridEvent eventGridEvent = eventGridEvents[i];
+                    Object eventDataObject = eventGridEvent.data();
+                    if (eventDataObject instanceof SubscriptionValidationEventData) {
+                        // This is to handle the validation event that the Event Grid sends when the subscription is created.
+                        SubscriptionValidationEventData eventData = (SubscriptionValidationEventData) eventDataObject;
+                        String validationCode = eventData.validationCode();
+                        logger.info("Got SubscriptionValidation event data, validation code: " + validationCode + " from topic: " + eventGridEvent.topic());
+
+                        // TODO any additional validation (as required) and then return back the below response
+
+                        SubscriptionValidationResponse responseData = new SubscriptionValidationResponse();
+                        responseData.withValidationResponse(validationCode);
+                        return request.createResponseBuilder(HttpStatus.OK).body(responseData).build();
+                    } else {
+                        logger.info("Received event with type = " + eventGridEvent.eventType() + " and data = " + eventGridEvent.data());
+
+                        URL urlForGetRequest = new URL("https://www.bbc.co.uk/");
+                        HttpURLConnection httpURLConnection = (HttpURLConnection)urlForGetRequest.openConnection();
+                        httpURLConnection.setRequestMethod("GET");
+                        int responseCode = httpURLConnection.getResponseCode();
+                        logger.info("Getting from the bbc, code = " + responseCode);
+
+                        return request.createResponseBuilder(HttpStatus.OK).build();
+                    }
+                }
+            } catch (IOException e) {
+                logger.info("A pb occurred while deserializing an event in our function");
+                return request.createResponseBuilder(HttpStatus.BAD_REQUEST).body("Event could not be deserialized.").build();
+            }
+
+        } else {
+            logger.info("No body in this request");
+            return request.createResponseBuilder(HttpStatus.OK).build();
+        }
+
+        return request.createResponseBuilder(HttpStatus.OK).build();
+    }
+}
