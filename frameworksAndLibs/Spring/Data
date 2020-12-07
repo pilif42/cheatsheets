@@ -647,3 +647,187 @@ Page<Payment> findPaymentsWithinBillingPeriod(
 
 - Sample code with Cosmos DB:
 https://github.com/Azure-Samples/azure-spring-data-cosmos-java-sql-api-getting-started
+
+
+********************************************************************************
+
+
+- JPA query to fetch items (Verifications) based on the values in an embedded list:
+
+@Entity
+@Getter
+@Setter
+@EqualsAndHashCode
+public class Verification {
+    /**
+     * We have at most one card per organisation.
+     */
+    @Id
+    private UUID organisationId;
+    private String token;
+    private String verification;
+    private VerificationStatus status = VerificationStatus.PENDING;
+    private String recurringSale;
+    private Integer expiryMonth;
+    private Integer expiryYear;
+
+    @ElementCollection
+    private Set<Notification> notifications;
+}
+
+And
+
+@Embeddable
+@Getter
+@Setter
+@EqualsAndHashCode
+public class Notification {
+    @Enumerated(EnumType.STRING)
+    private NotificationType notificationType;
+    private Instant sentDate;
+}
+
+
+The query should return all verifications for which:
+- there is no notification yet
+- there is an existing EXPIRY_DATE notification but with an ‘old’ sentDate. Irrespective of whether or not there is another type of notification.
+See tests below for full details.
+
+
+@Query(value = "SELECT v " +
+        "FROM Verification v LEFT JOIN v.notifications vn ON vn.notificationType = 'EXPIRY_DATE' " +
+        "WHERE (vn.sentDate IS NULL OR vn.sentDate < :expiryDateNotifiedBoundary) " +
+        "AND v.status = 0 AND v.expiryMonth = :expiryMonth AND v.expiryYear = :expiryYear")
+Set<Verification> findPassedVerificationsToNotifyForExpiryDate(int expiryMonth, int expiryYear, Instant expiryDateNotifiedBoundary);
+
+
+@ParameterizedTest
+@MethodSource
+@NullSource
+public void findPassedVerificationsToNotifyForExpiryDate_passedVerificationStoredWithSearchedForMonthAndYear_recordShouldBeReturned(Set<Notification> notifications) {
+    // GIVEN
+    final int expMonth = 10;
+    final int expYear = 2020;
+    Verification v = new Verification();
+    v.setOrganisationId(UUID.randomUUID());
+    v.setExpiryMonth(expMonth);
+    v.setExpiryYear(expYear);
+    v.setNotifications(notifications);
+    v.setVerification("verification url");
+    v.setToken("token url");
+    v.setStatus(VerificationStatus.PASSED);
+    v = repo.save(v);
+
+    // WHEN
+    Set<Verification> resultSet = repo.findPassedVerificationsToNotifyForExpiryDate(expMonth, expYear, Instant.now());
+
+    // THEN
+    assertEquals(1, resultSet.size());
+    assertEquals(v, resultSet.iterator().next());
+}
+
+private static Stream<Set<Notification>> findPassedVerificationsToNotifyForExpiryDate_passedVerificationStoredWithSearchedForMonthAndYear_recordShouldBeReturned() {
+    Set<Notification> notifications = new HashSet<>();
+    Notification notification = new Notification();
+    notification.setNotificationType(NotificationType.EXPIRY_DATE);
+    notification.setSentDate(Instant.now().minus(1L, ChronoUnit.MINUTES));
+    notifications.add(notification);
+
+    Set<Notification> otherTypeNotifications = new HashSet<>();
+    Notification otherTypeNotification = new Notification();
+    otherTypeNotification.setNotificationType(NotificationType.NOT_USED_IN_6_MONTHS);
+    otherTypeNotification.setSentDate(Instant.now().minus(1L, ChronoUnit.MINUTES));
+    otherTypeNotifications.add(otherTypeNotification);
+
+    Set<Notification> multiTypeNotifications = new HashSet<>();
+    multiTypeNotifications.add(notification);
+    multiTypeNotifications.add(otherTypeNotification);
+
+    return Stream.of(notifications, otherTypeNotifications, multiTypeNotifications);
+}
+
+@Test
+public void findPassedVerificationsToNotifyForExpiryDate_passedVerificationStoredWithDifferentMonth_recordShouldNotBeReturned() {
+    // GIVEN
+    final int expMonth = 10;
+    final int expYear = 2020;
+    Verification v = new Verification();
+    v.setOrganisationId(UUID.randomUUID());
+    v.setExpiryMonth(expMonth);
+    v.setExpiryYear(expYear);
+    v.setVerification("verification url");
+    v.setToken("token url");
+    v.setStatus(VerificationStatus.PASSED);
+    repo.save(v);
+
+    // WHEN
+    Set<Verification> resultSet = repo.findPassedVerificationsToNotifyForExpiryDate(expMonth + 1, expYear, Instant.now());
+
+    // THEN
+    assertTrue(resultSet.isEmpty());
+}
+
+@Test
+public void findPassedVerificationsToNotifyForExpiryDate_passedVerificationStoredWithDifferentYear_recordShouldNotBeReturned() {
+    // GIVEN
+    final int expMonth = 10;
+    final int expYear = 2020;
+    Verification v = new Verification();
+    v.setOrganisationId(UUID.randomUUID());
+    v.setExpiryMonth(expMonth);
+    v.setExpiryYear(expYear);
+    v.setVerification("verification url");
+    v.setToken("token url");
+    v.setStatus(VerificationStatus.PASSED);
+    repo.save(v);
+
+    // WHEN
+    Set<Verification> resultSet = repo.findPassedVerificationsToNotifyForExpiryDate(expMonth, expYear + 1, Instant.now());
+
+    // THEN
+    assertTrue(resultSet.isEmpty());
+}
+
+@ParameterizedTest
+@MethodSource
+public void findPassedVerificationsToNotifyForExpiryDate_passedVerificationStoredWithSearchedForMonthAndYearButAlreadyNotified_recordShouldNotBeReturned(Set<Notification> notifications) {
+    // GIVEN
+    final int expMonth = 10;
+    final int expYear = 2020;
+    Verification v = new Verification();
+    v.setOrganisationId(UUID.randomUUID());
+    v.setExpiryMonth(expMonth);
+    v.setExpiryYear(expYear);
+    v.setNotifications(notifications);
+    v.setVerification("verification url");
+    v.setToken("token url");
+    v.setStatus(VerificationStatus.PASSED);
+    repo.save(v);
+
+    // WHEN
+    Instant expiryDateNotifiedBoundary = notifications.stream()
+            .filter(notification -> notification.getNotificationType().equals(NotificationType.EXPIRY_DATE))
+            .findFirst().get().getSentDate();
+    Set<Verification> resultSet = repo.findPassedVerificationsToNotifyForExpiryDate(expMonth, expYear, expiryDateNotifiedBoundary);
+
+    // THEN
+    assertTrue(resultSet.isEmpty());
+}
+
+private static Stream<Set<Notification>> findPassedVerificationsToNotifyForExpiryDate_passedVerificationStoredWithSearchedForMonthAndYearButAlreadyNotified_recordShouldNotBeReturned() {
+    Set<Notification> notifications = new HashSet<>();
+    Notification notification = new Notification();
+    notification.setNotificationType(NotificationType.EXPIRY_DATE);
+    Instant now = Instant.now();
+    notification.setSentDate(now);
+    notifications.add(notification);
+
+    Set<Notification> multiTypeNotifications = new HashSet<>();
+    multiTypeNotifications.add(notification);
+    Notification otherTypeNotification = new Notification();
+    otherTypeNotification.setNotificationType(NotificationType.NOT_USED_IN_6_MONTHS);
+    otherTypeNotification.setSentDate(Instant.now().minus(1L, ChronoUnit.MINUTES));
+    multiTypeNotifications.add(otherTypeNotification);
+
+    return Stream.of(notifications, multiTypeNotifications);
+}
