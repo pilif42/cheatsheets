@@ -831,3 +831,84 @@ private static Stream<Set<Notification>> findPassedVerificationsToNotifyForExpir
 
     return Stream.of(notifications, multiTypeNotifications);
 }
+
+
+- How to solve Caused by: org.springframework.core.convert.ConverterNotFoundException:
+No converter found capable of converting from type [byte[]] to type [@org.springframework.data.jpa.repository.Query java.util.UUID] when using the query below:
+
+@Query(value = "SELECT v.organisation_id " +
+        "FROM Verification v LEFT JOIN Payment p " +
+        "ON v.organisation_id = p.organisation_id " +
+        "WHERE ....",
+        nativeQuery = true)
+Set<UUID> getOrgIdsToNotifyForInactiveCard(Instant boundaryStart, Instant boundaryEnd);
+
+The Query is defined in a repository class:
+public interface VerificationRepository extends CrudRepository<Verification, UUID> {
+
+The solution is to use a Projection defining the single field that the query returns:
+public interface VerificationOrgIdOnlyView {
+    byte[] getOrgId();
+}
+
+With query:
+@Query(value = "SELECT v.organisation_id AS \"orgId\" " +
+        "FROM Verification v LEFT JOIN Payment p " +
+        "ON v.organisation_id = p.organisation_id " +
+        "WHERE ...",
+        nativeQuery = true)
+Set<VerificationOrgIdOnlyView> getOrgIdsToNotifyForInactiveCardBis(Instant boundaryStart, Instant boundaryEnd);
+
+And then we can go from byte[] to UUID ourselves doing:
+ByteBuffer bb = ByteBuffer.wrap(resultAsBytes);
+long high = bb.getLong();
+long low = bb.getLong();
+UUID uuid = new UUID(high, low);
+
+
+- Can't use the below to update an embedded collection (notifications) in an entity (verification):
+@Modifying
+@Query("UPDATE Verification v " +
+            "SET v.notifications = :notifications " +
+            "WHERE v.organisationId = :organisationId " +
+            "AND v.verification = :verification")
+int updateNotifications(@Param("organisationId") UUID organisationId, @Param("verification") String verification, @Param("notifications") Set<Notification> notifications);
+
+You get the exception:
+org.springframework.dao.InvalidDataAccessApiUsageException: Parameter value [com.sample.entity.Notification@ae0a03fc] did not match expected type [java.util.Set (n/a)]; nested exception is java.lang.IllegalArgumentException: Parameter value [com.sample.entity.Notification@ae0a03fc] did not match expected type [java.util.Set (n/a)]
+
+The solution is to do:
+@Transactional(Transactional.TxType.REQUIRES_NEW)
+public void notifyOrganisation(Verification verification, Instant notificationDate, NotificationType notificationType) {
+        String notificationTypeName = notificationType.name();
+        String verificationUrl = verification.getVerification();
+
+        int updated;
+        if (NotificationUtil.isNewNotification(verification.getNotifications(), notificationType)) {
+            updated = verificationRepository.createNewNotification(notificationTypeName, verificationUrl);
+        } else {
+            updated = verificationRepository.updateExistingNotification(notificationTypeName, notificationDate, verificationUrl);
+        }
+
+        if (updated == 1) {
+            eventService.publishCardNotification(verification.getOrganisationId(), notificationType);
+        }
+    }
+
+Where
+
+@Modifying
+@Query(value = "INSERT INTO verification_notifications (verification_organisation_id, notification_type) " +
+        "SELECT organisation_id, :notificationType FROM verification WHERE verification = :verification",
+        nativeQuery = true)
+int createNewNotification(@Param("notificationType") String notificationType,
+                        @Param("verification") String verification);
+
+@Modifying
+@Query(value = "UPDATE verification_notifications SET sent_date = :sentDate " +
+        "WHERE notification_type = :notificationType " +
+        "AND verification_organisation_id = (SELECT organisation_id from verification where verification = :verification)",
+        nativeQuery = true)
+int updateExistingNotification(@Param("notificationType") String notificationType,
+                          @Param("sentDate") Instant sentDate,
+                          @Param("verification") String verification);
