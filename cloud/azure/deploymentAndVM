@@ -37,4 +37,111 @@ https://docs.microsoft.com/en-gb/azure/azure-resource-manager/templates/overview
                 - 2 policies: 1 Send policy to write msgs to it, 1 Listen to read msgs from it.
                 - 1 Subscription.
           - all policies were defined using https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-authentication-and-authorization#shared-access-signature
-          
+
+
+- To add a post deployment test step in an Azure DevOps pipeline:
+Goal: once the app has been deployed and started, invoke the GET health check
+endpoint implemented using Spring Actuator.
+
+In deployEvents.yaml, add:
+- stage: Test_Events
+  dependsOn: Deploy_Events
+  displayName: Test Events ${{ parameters.appEnvironment }}
+  variables:
+    appService: ${{ parameters.appEnvironment }}events
+    resourceGroup: ${{ parameters.appEnvironment }}_rg_event
+  jobs:
+    - template: ../jobs/testEvents.yaml
+      parameters:
+        appEnvironment: ${{ parameters.appEnvironment }}
+        subscription: ${{ parameters.subscription }}
+        resourceGroup: ${{ variables.resourceGroup }}
+        appService: ${{ variables.appService }}
+
+
+Where testEvents.yaml is:
+parameters:
+  appEnvironment: "dev1"
+  subscription: "Enterprise Deploy (Dev1 Subscription"
+  resourceGroup: "dev1_rg_event"
+  appService: "dev1events"
+
+jobs:
+  - job: Events_Test
+    displayName: "Events Test ${{ parameters.appEnvironment }}"
+    steps:
+      - download: none
+
+      - checkout: self
+
+      - task: AzureCLI@2
+        displayName: 'Add Hosted Pipeline Access Rule'
+        inputs:
+          azureSubscription: ${{ parameters.subscription }}
+          scriptType: pscore
+          scriptLocation: scriptPath
+          scriptPath: $(Build.SourcesDirectory)/pipelines/scripts/addPipelineAccessRule.ps1
+          arguments: -resourceGroup ${{ parameters.resourceGroup }} -appService ${{ parameters.appService }}
+
+      - task: PowerShell@2
+        displayName: "Invoke Health Check Endpoint"
+        inputs:
+          filePath: $(Build.SourcesDirectory)/pipelines/scripts/invokeHealthCheck.ps1
+          arguments: -appService ${{ parameters.appService }}
+          failOnStderr: true
+
+      - task: AzureCLI@2
+        displayName: 'Remove Hosted Pipeline Access Rule'
+        inputs:
+          azureSubscription: ${{ parameters.subscription }}
+          scriptType: pscore
+          scriptLocation: scriptPath
+          scriptPath: $(Build.SourcesDirectory)/pipelines/scripts/removePipelineAccessRule.ps1
+          arguments: -resourceGroup ${{ parameters.resourceGroup }} -appService ${{ parameters.appService }}
+        condition: always()
+
+Note the condition: always(). This is to run the task ‘Remove Hosted Pipeline Access Rule’
+all the time, even if the ‘Invoke Health Check Endpoint’ fails.
+
+
+addPipelineAccessRule.ps1 is required to give access to the endpoint to the
+pipeline agent. Otherwise, you get a 403 Forbidden. We implemented it using
+AzureCLI@2 rather than the solution with AzurePowerShell@4 described at
+https://keithjr.dev/development/hosted_build_agent/. We were getting the error:
+Only SPN credential auth scheme is supported for non windows agent.
+
+# This script enables the pipeline to access the events healthcheck endpoint.
+Param(
+    [Parameter(Mandatory=$True)]
+    [string]$resourceGroup,
+
+    [Parameter(Mandatory=$True)]
+    [string]$appService
+)
+
+$HostedIPAddress = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
+az webapp config access-restriction add -g "$resourceGroup" -n "$appService" --rule-name "AzureDevOpsPipelineAgent" --action Allow --ip-address "$HostedIPAddress/32" --priority 100
+
+
+invokeHealthCheck.ps1
+# Script to invoke the Health Check Endpoint.
+Param(
+    [Parameter(Mandatory=$True)]
+    [string]$appService
+)
+$uri = "https://" + $appService + ".azurewebsites.net/actuator/health/"
+Invoke-WebRequest -Uri $uri -ErrorAction Stop
+
+
+removePipelineAccessRule.ps1
+# This script removes access to the events healthcheck endpoint from the pipeline.
+Param(
+    [Parameter(Mandatory=$True)]
+    [string]$resourceGroup,
+
+    [Parameter(Mandatory=$True)]
+    [string]$appService
+)
+
+az webapp config access-restriction remove -g "$resourceGroup" -n "$appService" --rule-name "AzureDevOpsPipelineAgent"
+ 
