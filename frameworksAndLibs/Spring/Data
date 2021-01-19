@@ -912,3 +912,114 @@ int createNewNotification(@Param("notificationType") String notificationType,
 int updateExistingNotification(@Param("notificationType") String notificationType,
                           @Param("sentDate") Instant sentDate,
                           @Param("verification") String verification);
+
+
+- Example of a projection class:
+We need a projection class not to have to use an eager fetching on the
+@ElementCollection in the entity class Verification.
+
+If we try to only use the class Verification, we end up with a runtime exception
+at times as it complains that notifications is not initialised.
+
+One quick fix is to use eager fetching on the @ElementCollection.
+
+A better fix is to define a projection class VerificationView that you use
+whenever you need to retrieve a Verification but do not need its notifications.
+See the repository class for examples.
+
+package com.sample.entity;
+
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+
+import javax.persistence.ElementCollection;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import java.time.Instant;
+import java.util.Set;
+import java.util.UUID;
+
+@Entity
+@Getter
+@Setter
+@EqualsAndHashCode
+public class Verification {
+    @Id
+    private UUID organisationId;
+
+    @CreationTimestamp
+    private Instant created;
+
+    ...
+
+    @ElementCollection
+    private Set<Notification> notifications;
+}
+
+
+package com.sample.entity;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+import java.util.UUID;
+
+/**
+ * Projection to use when retrieving a Verification without its notifications.
+ */
+@Getter
+@Setter
+@AllArgsConstructor
+public class VerificationView implements Serializable {
+    private UUID organisationId;
+
+    private Integer expiryMonth;
+    private Integer expiryYear;
+
+    private String recurringSale;
+    private String token;
+    private String verification;
+
+    private VerificationStatus status;
+}
+
+
+package com.sample.repository;
+
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.query.Param;
+import com.sample.entity.Verification;
+import com.sample.entity.VerificationStatus;
+import com.sample.entity.VerificationView;
+
+import javax.transaction.Transactional;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+public interface VerificationRepository extends CrudRepository<Verification, UUID> {
+    Optional<VerificationView> findVerificationViewByOrganisationId(UUID organisationId);
+
+    Set<VerificationView> findVerificationViewsByStatus(VerificationStatus status);
+
+    @Query("SELECT new com.sample.entity.VerificationView(v.organisationId, v.expiryMonth, v.expiryYear, v.recurringSale, v.token, v.verification, v.status) " +
+            "FROM Verification v " +
+            "WHERE v.status = 0 " +
+            "AND (v.expiryMonth IS NULL OR v.expiryYear IS NULL)")
+    Set<VerificationView> findPassedVerificationsWithUnsetExpiryDate();
+
+    @Query(value = "SELECT v " +
+            "FROM Verification v " +
+            "LEFT JOIN FETCH v.notifications vn " +
+            "WHERE v.status = 0 AND v.expiryMonth = :expiryMonth AND v.expiryYear = :expiryYear")
+    Set<Verification> findExpiringPassedVerifications(int expiryMonth, int expiryYear);
+
+    void deleteByOrganisationIdAndVerification(UUID organisationId, String verification);
+}
