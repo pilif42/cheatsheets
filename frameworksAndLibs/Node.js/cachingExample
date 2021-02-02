@@ -1,0 +1,277 @@
+- The server-side call (to an external config endpoint part of the Payments API)
+is made in getConfigData.js:
+
+const {requestAsService} = require('sample-common-node');
+const {config} = require('../config');
+const log = require('./log');
+
+module.exports = function getConfigData() {
+    let targetUrl = config.paymentsUrl + '/config';
+
+    return requestAsService(null, config.paymentsUrl, {
+        url: targetUrl,
+        json: true
+    }).catch(async err => {
+        log.error({err}, "Error getting config data from the Payments API");
+        return Promise.reject(err);
+    });
+}
+
+
+We do not want this call to happen too often as we get payments config data back
+(VAT rate, etc.), ie static data. Instead, we want this call's results to be cached.
+
+
+This is achieved thanks to paymentsConfigData.js:
+
+const {cache} = require('../util/cache');
+const getConfigData = require('../payments/getConfigData');
+
+const CACHE_EXPIRY = 10 * 60 * 1000; // 10 minutes
+const cachedConfigData = cache(getConfigData, [], CACHE_EXPIRY);
+
+module.exports = async function paymentsConfigData() {
+    const configData = cachedConfigData();
+    if(!configData) {
+        return null;
+    }
+    return configData;
+}
+
+
+Where cache.js is
+
+const log = require('../util/logging').createLogger('cache');
+
+// This module provides a cache for data (config data from the Payments API, etc.).
+// The goal of the cache is to provide a synchronous API to get data - so the front end always gets a quick result.
+// If the result we hold is old (or we hold no result at all), then the cache returns the best that it can, and
+// the front-end will call again soon.
+// The cache will never call the function concurrently, so that we don't hammer back-end services too often.
+// func: The function to call. This function must return a promise
+// args: The arguments to use for the function call
+// expiry: The expiry time of the cache, in ms. After the expiry time you will get stale results until the
+//         function completes again
+exports.cache = function(func, args, expiry) {
+    const logContext = { funcName: func.name , args };
+    let currentResult = null;
+    let currentError = null;
+    let currentPromise;
+
+    return function() {
+        if(currentPromise) {
+            // Someone is already requesting data, so we don't want to kick off another call
+            log.info(logContext, "Cache is already getting a fresh result");
+        } else if(!currentResult || Date.now() > currentResult.timestamp + expiry) {
+            // Our results are out of date, so we need to go and get some more
+            log.info(logContext, "Cache is out of date or empty. Getting a new value");
+            currentPromise = func.apply(null, args).then(result => {
+                log.info(logContext, "Cache got results");
+                currentPromise = null;
+                currentResult = result;
+                currentError = null;
+                currentResult.timestamp = Date.now();
+            }, err => {
+                log.error({ err, name: func.name, args }, "Cache caught an error while caching function call");
+                currentPromise = null;
+                // Keep an old result, if we have one, and only store the error details if we don't have
+                // a good result to return
+                if(!currentResult) {
+                    currentError = err;
+                }
+            });
+
+            // It is possible that the currentPromise will never be resolved. If that happens we don't want
+            // to poison the cache, so we have to give up on that attempt. We check if the promise that we
+            // just created is still active after the expiry time, and if it is, then we clear it so that
+            // another client can try again.
+            const myPromise = currentPromise;
+            setTimeout(() => {
+                if(currentPromise === myPromise) {
+                    log.warn(logContext, "Cache detected a promise that did not finish before the expiry time");
+                    currentPromise = null;
+                }
+            }, expiry);
+
+        }
+        // To keep this call synchronous, return whatever data we have.
+        if(!currentResult && currentError) {
+            throw currentError;
+        }
+        return currentResult;
+    }
+}
+
+
+And paymentsConfigData.js is called in payments.js:
+
+router.get('/config', async (req, res) => {
+    try {
+        const configData = await paymentsConfigData();
+        if (configData) {
+            res.send(configData);
+        } else {
+            log.warn("Failed to get payment config data.");
+            res.status(500).end();
+        }
+    } catch(err) {
+        log.error({err}, "Caught exception getting payment config data.");
+        res.status(500).end();
+    }
+});
+
+
+In terms of unit testing, we have:
+
+cache.test.js
+
+import {cache} from './cache';
+
+// These tests are based on a common expiry interval for the cache. This value needs to be high enough for
+// setInterval() to be accurate, but not too high or it will slow down the test.
+const timeunit = 100;
+
+it('Should call the cached function when there are no results', function(done) {
+    const start = Date.now();
+    const fn = jest.fn();
+    let counter = 0;
+    fn.mockImplementation(() => Promise.resolve({ test: 'result' + counter++ }));
+    const cached = cache(fn, ['test','args'], timeunit);
+    expect(cached()).toBe(null);
+    expect(fn).toHaveBeenCalledWith('test', 'args');
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    expect(cached()).toBe(null);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    // Wait long enough for a result, but not long enough for an expiry
+    setTimeout(() => {
+        const result = cached();
+        expect(result.test).toBe('result0');
+        expect(result.timestamp).toBeGreaterThanOrEqual(start);
+        expect(result.timestamp).toBeLessThanOrEqual(Date.now());
+        expect(fn).toHaveBeenCalledTimes(1);
+
+        // Wait longer, expecting the same result, but a second call to the mock function
+        setTimeout(() => {
+            const result = cached();
+            expect(result.test).toBe('result0');
+            expect(result.timestamp).toBeGreaterThanOrEqual(start);
+            expect(result.timestamp).toBeLessThanOrEqual(Date.now());
+            expect(fn).toHaveBeenCalledTimes(2);
+
+            // Wait longer, expecting the second result, but no more calls to the mock function
+            setTimeout(() => {
+                const result = cached();
+                expect(result.test).toBe('result1');
+                expect(result.timestamp).toBeGreaterThanOrEqual(start);
+                expect(result.timestamp).toBeLessThanOrEqual(Date.now());
+                expect(fn).toHaveBeenCalledTimes(2);
+                done();
+            }, timeunit * 0.5);
+        }, timeunit * 0.8);
+    }, timeunit * 0.5);
+});
+
+it('Should handle errors calling the cached function', function(done) {
+    const fn = jest.fn(() => Promise.reject('test error'));
+    const cached = cache(fn, [], timeunit);
+    const result = cached();
+    expect(result).toBe(null);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    // Wait a moment, and make another request
+    setTimeout(() => {
+        try {
+            cached();
+            fail(); // Cached should throw us an error
+        } catch(error) {
+            expect(error).toBe('test error');
+        }
+        expect(fn).toHaveBeenCalledTimes(2);
+        done();
+    }, timeunit * 0.5);
+});
+
+it('Should handle errors calling the cached function when we already have a result', function(done) {
+    const fn = jest.fn();
+    fn.mockImplementationOnce(() => Promise.resolve({ test: 'result' }));
+    fn.mockImplementation(() => Promise.reject('error'));
+    const cached = cache(fn, [], timeunit);
+    const result = cached();
+    expect(result).toBe(null);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    // Wait for a timeout, and make another request
+    setTimeout(() => {
+        const result = cached();
+        expect(result.test).toBe('result');
+        expect(fn).toHaveBeenCalledTimes(2);
+        done();
+    }, timeunit * 1.5);
+});
+
+it('Should re-attempt the function call if the promise is never resolved', function(done) {
+    const functionThatNeverResolves = jest.fn().mockImplementation(() => new Promise((resolve, reject) => {}));
+
+    const cached = cache(functionThatNeverResolves, [], timeunit);
+    expect(cached()).toBe(null);
+    expect(cached()).toBe(null);
+    expect(functionThatNeverResolves).toHaveBeenCalledTimes(1);
+
+    // Wait for the original request to time out, and then try again
+    setTimeout(() => {
+        expect(cached()).toBe(null);
+        expect(functionThatNeverResolves).toHaveBeenCalledTimes(2);
+        done();
+    }, timeunit * 1.5);
+});
+
+
+paymentsConfigData.test.js
+
+import {cache} from '../util/cache';
+
+const getConfigData = require('./getConfigData');
+
+jest.mock('../util/cache');
+
+// Mock the cache, so that we can inject different results
+const cacheMocks = [];
+cache.mockImplementation((realFn, args) => {
+    const mock = jest.fn();
+    cacheMocks.push(mock);
+    return mock;
+});
+
+const paymentsConfigData = require('./paymentsConfigData');
+
+expect(cache).toHaveBeenCalledTimes(1);
+expect(cache).toHaveBeenCalledWith(getConfigData, [], 10 * 60 * 1000);
+
+const [paymentsConfigDataCache] = cacheMocks;
+
+const mockPaymentsConfigDataResult = {
+    vatRate: '0.200'
+};
+
+beforeEach(function() {
+    cacheMocks.forEach((cache, index) => {
+        cache.mockReset()
+        cache.mockImplementation(() => mockPaymentsConfigDataResult);
+    });
+});
+
+it('Should handle empty payments config data', async function() {
+    paymentsConfigDataCache.mockImplementation(() => null);
+    const result = await paymentsConfigData();
+    expect(result).toBe(null);
+});
+
+it('Should query the payments config data cache', async function() {
+    const result = await paymentsConfigData();
+    expect(paymentsConfigDataCache).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+        vatRate: '0.200'
+    });
+});
