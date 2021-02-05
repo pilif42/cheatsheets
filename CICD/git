@@ -146,6 +146,12 @@
 		- to revert master to the given tag: git push -f (ATTENTION: you will lose the history between this tag and the latest!!!)
 
 
+- to move tag 1.2.0 onto commit with full SHA ca84939a3b0fc0d09d970c269512454222040883 (master branch):
+		- cd into the project being on the master branch
+		- git tag --force 1.2.0 ca84939a3b0fc0d09d970c269512454222040883
+		- git push --force --tags
+
+
 - to work with a project which is in 2 different git repos (1 in gitlab, 1 in github):
 		- imagine that you first cloned your project from GitLab. John then copied the entire project in GitHub and has hooked Jenkins jobs to the GitHub repo.
 		- you need to do first:
