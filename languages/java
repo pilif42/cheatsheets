@@ -38,3 +38,93 @@
 
             assertTrue(TestUtil.compareInstants(instantOne, instantTwo));
           }
+
+
+- Enums:
+Problem to solve: we want to select the One relevant organisation in an array of
+Organisations based on plan names.
+
+Define an Enum for the plan name. Give a weight to each plan. The deserialize
+method is required as the plan name received from the external API can be an
+empty string. Also, nothing tells us that in the future, they will not send us
+null values.
+
+package com.sample.dto;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.Getter;
+import org.springframework.util.ObjectUtils;
+
+@Getter
+public enum DataHubPlan {
+    None(0), FreeData(1), PremiumBelow(2), PremiumAbove(3);
+
+    private final int weight;
+
+    DataHubPlan(int weight) {
+        this.weight = weight;
+    }
+
+    @JsonCreator
+    public static DataHubPlan deserialize(String input) {
+        if (!ObjectUtils.isEmpty(input)) {
+            for (DataHubPlan plan: values()) {
+                if (plan.name().equalsIgnoreCase(input)) {
+                    return plan;
+                }
+            }
+        }
+        return None;
+    }
+}
+
+
+
+package com.sample.util;
+
+import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.sample.bfin.dto.OrganisationDto;
+import com.sample.dto.DataHubPlan;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+
+public class OrganisationUtil {
+    public static Optional<OrganisationDto> getRelevantOrg(OrganisationDto[] organisationDtos) {
+        Optional<OrganisationDto> result = Optional.empty();
+        if (organisationDtos != null) {
+            List<OrganisationDto> organisationDtoList = Arrays.asList(organisationDtos);
+            List<OrganisationDto> listWithoutNulls = Lists.newArrayList(
+                    Iterables.filter(organisationDtoList, Predicates.notNull()));
+
+            int size = listWithoutNulls.size();
+            if (size > 0) {
+                if (size == 1) {
+                    result = Optional.of(listWithoutNulls.get(0));
+                } else {
+                    result = listWithoutNulls.stream().max(OrganisationUtil::compareByPlan);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static int compareByPlan(OrganisationDto org1, OrganisationDto org2) {
+        return getPlanWeight(org1).compareTo(getPlanWeight(org2));
+    }
+
+    private static Integer getPlanWeight(OrganisationDto org) {
+        Integer result = Integer.MIN_VALUE;
+        if (org != null) {
+            DataHubPlan plan = org.getPlan();
+            if (plan != null) {
+                result = plan.getWeight();
+            }
+        }
+        return result;
+    }
+}
+ 
