@@ -144,4 +144,48 @@ Param(
 )
 
 az webapp config access-restriction remove -g "$resourceGroup" -n "$appService" --rule-name "AzureDevOpsPipelineAgent"
- 
+
+
+- To run Cuke tests vs an API by granting temporary access to it to the pipeline:
+parameters:
+  mavenProfile: dev
+  subscription: "Dev1 Subscription"
+  resourceGroup: "dev1_rg_monetization"
+  appService: "dev1monetization"
+
+jobs:
+  - job: Monetization_Test
+    displayName: "${{ parameters.mavenProfile }} Monetization Test"
+    steps:
+      - download: none
+
+      - checkout: self
+      - checkout: common-app
+
+      - task: AzureCLI@2
+        displayName: 'Add Hosted Pipeline Access Rule'
+        inputs:
+          azureSubscription: ${{ parameters.subscription }}
+          scriptType: pscore
+          scriptLocation: scriptPath
+          scriptPath: $(Build.SourcesDirectory)/common-app/scripts/network/addPipelineAccessRule.ps1
+          arguments: -resourceGroup ${{ parameters.resourceGroup }} -appService ${{ parameters.appService }}
+
+      - task: Maven@3
+        displayName: "Acceptance Tests for ${{ parameters.mavenProfile }}"
+        inputs:
+          mavenPomFile: $(Build.SourcesDirectory)/the-api/acceptance-test/pom.xml
+          goals: 'clean test'
+          options: '-P ${{ parameters.mavenProfile }}'
+          testRunTitle: 'Monetization API Acceptance Tests - ${{ parameters.mavenProfile }}'
+
+      - task: AzureCLI@2
+        displayName: 'Remove Hosted Pipeline Access Rule'
+        inputs:
+          azureSubscription: ${{ parameters.subscription }}
+          scriptType: pscore
+          scriptLocation: scriptPath
+          scriptPath: $(Build.SourcesDirectory)/common-app/scripts/network/removePipelineAccessRule.ps1
+          arguments: -resourceGroup ${{ parameters.resourceGroup }} -appService ${{ parameters.appService }}
+        condition: always()
+        
