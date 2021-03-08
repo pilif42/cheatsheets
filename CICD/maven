@@ -80,3 +80,15 @@
 										- mapping.txt: Lists the mapping between the original and obfuscated class, method, and field names. This file is important when you receive a bug report from a release build, because it translates the obfuscated stack trace back to the original class, method, and member names. See Decoding Obfuscated Stack Traces for more information.
 										- seeds.txt: Lists the classes and members that are not obfuscated
 										- usage.txt: Lists the code that was stripped from the .apk
+
+
+- To find the recommended plugin versions for your modules:
+Add the plugin versions-maven-plugin with:
+		<plugin>
+		<groupId>org.codehaus.mojo</groupId>
+		<artifactId>versions-maven-plugin</artifactId>
+		<version>2.5</version>
+		</plugin>
+
+For plugin versions, run the cmd: mvn versions:display-plugin-updates
+For dependencies, mvn versions:display-dependency-updates
